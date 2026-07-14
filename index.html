@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio Mockup | Computing x Literature</title>
+    <meta
+      name="description"
+      content="A responsive portfolio mockup blending computing and literature aesthetics."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Back to top">J.M.</a>
+      <span
+        class="header-logo-target"
+        id="brand-logo-target"
+        aria-hidden="true"
+      ></span>
+      <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Main">
+        <a href="#about">About</a>
+        <a href="#work">Work</a>
+        <a href="#writing">Writing</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
+    <a class="logo-float" id="logo-float" href="#top" aria-label="Back to top">
+      <img
+        class="logo-float-image"
+        id="logo-float-image"
+        src="logo-clean-gray.png"
+        alt="Interwoven JM logo"
+      />
+    </a>
+
+    <main id="top">
+      <section class="landing section-border" aria-label="Landing logo">
+        <p class="kicker">Booting identity...</p>
+        <div class="landing-logo-shell" id="landing-logo-shell" aria-hidden="true"></div>
+      </section>
+
+      <section class="hero section-border reveal-on-scroll">
+        <p class="kicker">Portfolio Mockup</p>
+        <h1>
+          Computing logic.<br />
+          Literary voice.
+        </h1>
+        <p class="lede">
+          A minimal, sharp-edged portfolio concept inspired by editorial layouts
+          and terminal interfaces.
+        </p>
+      </section>
+
+      <section class="grid-two" id="about">
+        <article class="section-border reveal-on-scroll">
+          <h2>Profile</h2>
+          <p>
+            I study the architecture of systems and the architecture of
+            language. This site presents projects, essays, and current lines of
+            inquiry.
+          </p>
+        </article>
+
+        <article
+          class="terminal section-border reveal-on-scroll"
+          aria-label="Terminal snippet"
+        >
+          <div class="terminal-bar">
+            <span>~/portfolio</span>
+            <span>bash</span>
+          </div>
+          <pre><code>$ whoami
+student-researcher
+
+$ interests --list
+- computing
+- literature
+- language design
+- software systems
+
+$ status
+building thoughtful things...
+</code></pre>
+        </article>
+      </section>
+
+      <section class="section-border reveal-on-scroll" id="work">
+        <h2>Selected Work</h2>
+        <div class="card-grid">
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Project</p>
+            <h3>Compiler Notes</h3>
+            <p>
+              A compact visual guide connecting syntax, parsing, and meaning.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>On Reading Code as Text</h3>
+            <p>
+              A short piece on interpretation, style, and intention in software.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Research</p>
+            <h3>Human-Centered Tooling</h3>
+            <p>
+              Notes on making technical systems more legible and humane.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-border reveal-on-scroll" id="writing">
+        <h2>Writing & Notes</h2>
+        <p>
+          Placeholder for essays, annotation experiments, and reading logs. This
+          section can later host image-based scans, excerpts, and long-form
+          posts.
+        </p>
+      </section>
+
+      <section class="section-border reveal-on-scroll" id="contact">
+        <h2>Contact</h2>
+        <p>
+          <a href="mailto:you@example.com">you@example.com</a><br />
+          <a href="#">GitHub</a> | <a href="#">LinkedIn</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>(c) 2026 Your Name</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
