@@ -71,21 +71,39 @@ const normalizeTikTokUrl = (rawUrl) => {
 
 const fetchTikTokMetadata = async (videoUrl) => {
   const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`;
-  const response = await fetch(oembedUrl);
+  const attempts = [
+    { label: "direct", url: oembedUrl, parseAs: "json" },
+    {
+      label: "allorigins-raw",
+      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(oembedUrl)}`,
+      parseAs: "json"
+    }
+  ];
 
-  if (!response.ok) {
-    throw new Error(`TikTok metadata request failed (${response.status}).`);
+  let lastError = "unknown error";
+
+  for (let i = 0; i < attempts.length; i += 1) {
+    const attempt = attempts[i];
+    try {
+      const response = await fetch(attempt.url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const caption = (payload.title || "").trim();
+      const thumbnailUrl = (payload.thumbnail_url || "").trim();
+      if (!caption) {
+        throw new Error("No caption/title in metadata response.");
+      }
+
+      return { caption, thumbnailUrl };
+    } catch (error) {
+      lastError = `${attempt.label}: ${error.message}`;
+    }
   }
 
-  const payload = await response.json();
-  const caption = (payload.title || "").trim();
-  const thumbnailUrl = (payload.thumbnail_url || "").trim();
-
-  if (!caption) {
-    throw new Error("TikTok metadata returned no caption/title.");
-  }
-
-  return { caption, thumbnailUrl };
+  throw new Error(`Metadata fetch blocked or unavailable (${lastError}).`);
 };
 
 const cleanCaption = (caption) => {
@@ -154,14 +172,16 @@ const extractRecipe = (caption) => {
   let stepMode = /instructions|method|directions|steps/.test(lower);
 
   const ingredientSectionMatch = cleaned.match(
-    /ingredients?\s*[:\-]\s*(.*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]|$)/is
+    /ingredients?\s*[:\-]\s*([\s\S]*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]|$)/i
   );
   if (ingredientSectionMatch) {
     ingredients = parseIngredientsSection(ingredientSectionMatch[1]);
     ingredientMode = false;
   }
 
-  const stepsSectionMatch = cleaned.match(/(?:instructions?|method|directions?|steps?)\s*[:\-]\s*(.*)$/is);
+  const stepsSectionMatch = cleaned.match(
+    /(?:instructions?|method|directions?|steps?)\s*[:\-]\s*([\s\S]*)$/i
+  );
   if (stepsSectionMatch) {
     steps = parseStepsSection(stepsSectionMatch[1]);
     stepMode = false;
@@ -307,7 +327,7 @@ const renderRecipe = () => {
 };
 
 const downloadText = () => {
-  const text = recipeOutput?.value?.trim() || "";
+  const text = recipeOutput && recipeOutput.value ? recipeOutput.value.trim() : "";
   if (!text) {
     setStatus("Nothing to download yet. Extract a recipe first.");
     return;
@@ -371,7 +391,7 @@ const loadImageFromUrl = (url) =>
   });
 
 const drawRecipeCard = async () => {
-  const recipeText = recipeOutput?.value?.trim() || "";
+  const recipeText = recipeOutput && recipeOutput.value ? recipeOutput.value.trim() : "";
   if (!recipeText) {
     setStatus("Nothing to render yet. Extract a recipe first.");
     return;
@@ -387,7 +407,10 @@ const drawRecipeCard = async () => {
   }
 
   let templateImage = null;
-  const templateFile = templateImageInput?.files?.[0];
+  const templateFile =
+    templateImageInput && templateImageInput.files && templateImageInput.files[0]
+      ? templateImageInput.files[0]
+      : null;
   if (templateFile) {
     try {
       templateImage = await loadImageFromFile(templateFile);
@@ -397,8 +420,8 @@ const drawRecipeCard = async () => {
     }
   }
 
-  canvas.width = templateImage?.width || defaultWidth;
-  canvas.height = templateImage?.height || defaultHeight;
+  canvas.width = templateImage && templateImage.width ? templateImage.width : defaultWidth;
+  canvas.height = templateImage && templateImage.height ? templateImage.height : defaultHeight;
 
   if (templateImage) {
     ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
@@ -550,9 +573,12 @@ const fetchMetadataAndPopulate = async () => {
     setStatus("Metadata fetched successfully. You can now extract.");
   } catch (error) {
     state.thumbnailUrl = "";
-    setStatus(
+    const message =
       `Metadata fetch failed (${error.message}). Paste caption text manually and click Extract.`
-    );
+    setStatus(message);
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert(message);
+    }
   }
 };
 
@@ -603,7 +629,7 @@ if (downloadTxtButton) {
 
 if (downloadImageButton) {
   downloadImageButton.addEventListener("click", () => {
-    if (!recipeOutput?.value?.trim()) {
+    if (!(recipeOutput && recipeOutput.value && recipeOutput.value.trim())) {
       renderRecipe();
     }
     drawRecipeCard();
