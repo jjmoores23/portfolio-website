@@ -2,7 +2,7 @@ services:
   - type: web
     name: tiktok-recipe-extractor
     runtime: python
-    rootDir: Tiktok Extractor/Innovation Hour
+    rootDir: TikTok Extractor/Innovation Hour
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
