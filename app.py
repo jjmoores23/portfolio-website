@@ -1,9 +1,7 @@
-import os
 import io
 import re
 from dataclasses import dataclass
 from html import unescape
-from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -24,13 +22,6 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 ALLOWED_TEMPLATE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parent / "static" / "default-template.png"
-
-
-@dataclass
-class TikTokMetadata:
-    caption: str
-    thumbnail_url: Optional[str]
 
 
 @dataclass
@@ -38,6 +29,8 @@ class Recipe:
     title: str
     ingredients: List[str]
     steps: List[str]
+    notes: List[str]
+    source_caption: str
 
     def to_text(self) -> str:
         parts: List[str] = [self.title.strip() or "Extracted Recipe", ""]
@@ -52,6 +45,13 @@ class Recipe:
             parts.extend([f"{i + 1}. {step}" for i, step in enumerate(self.steps)])
             parts.append("")
 
+        if self.notes:
+            parts.append("Notes")
+            parts.extend([f"- {note}" for note in self.notes])
+            parts.append("")
+
+        parts.append("Source Caption")
+        parts.append(self.source_caption.strip())
         return "\n".join(parts).strip() + "\n"
 
 
@@ -65,7 +65,7 @@ def normalize_tiktok_url(raw_url: str) -> str:
     return raw_url
 
 
-def fetch_tiktok_metadata(video_url: str) -> TikTokMetadata:
+def fetch_caption_from_tiktok(video_url: str) -> str:
     errors: List[str] = []
 
     try:
@@ -78,9 +78,8 @@ def fetch_tiktok_metadata(video_url: str) -> TikTokMetadata:
         oembed_resp.raise_for_status()
         oembed = oembed_resp.json()
         title = (oembed.get("title") or "").strip()
-        thumbnail_url = (oembed.get("thumbnail_url") or "").strip() or None
         if title:
-            return TikTokMetadata(caption=title, thumbnail_url=thumbnail_url)
+            return title
         errors.append("oEmbed returned no title.")
     except Exception as exc:
         errors.append(f"oEmbed failed: {exc}")
@@ -99,16 +98,7 @@ def fetch_tiktok_metadata(video_url: str) -> TikTokMetadata:
         ]:
             tag = soup.select_one(selector[0])
             if tag and tag.get(selector[1]):
-                thumb_tag = soup.select_one('meta[property="og:image"]')
-                thumbnail_url = (
-                    str(thumb_tag.get("content")).strip()
-                    if thumb_tag and thumb_tag.get("content")
-                    else None
-                )
-                return TikTokMetadata(
-                    caption=str(tag.get(selector[1])).strip(),
-                    thumbnail_url=thumbnail_url,
-                )
+                return str(tag.get(selector[1])).strip()
 
         errors.append("No usable description metadata found in HTML.")
     except Exception as exc:
@@ -173,21 +163,13 @@ def extract_recipe(caption: str) -> Recipe:
 
     lower = cleaned.lower()
     title = "Extracted Recipe"
-    title_from_sections = re.split(
-        r"\bingredients?\b|\binstructions?\b|\bmethod\b|\bdirections?\b|\bsteps?\b",
-        cleaned,
-        maxsplit=1,
-        flags=re.IGNORECASE,
-    )[0].strip(" :-")
-    if title_from_sections and 2 <= len(title_from_sections.split()) <= 14:
-        title = title_from_sections.title()
-    else:
-        title_match = re.match(r"^([^.!?]{8,80})", cleaned)
-        if title_match:
-            title = title_match.group(1).strip().title()
+    title_match = re.match(r"^([^.!?]{8,80})", cleaned)
+    if title_match:
+        title = title_match.group(1).strip().title()
 
     ingredients: List[str] = []
     steps: List[str] = []
+    notes: List[str] = []
 
     ingredient_mode = "ingredients" in lower
     step_mode = any(token in lower for token in ["instructions", "method", "directions", "steps"])
@@ -233,6 +215,9 @@ def extract_recipe(caption: str) -> Recipe:
             if any(token in line_lower for token in ["mix", "bake", "cook", "stir", "serve", "boil", "fry"]):
                 ingredient_mode = False
                 step_mode = True
+            else:
+                notes.append(line)
+                continue
 
         if step_mode and not steps:
             if re.match(r"^\d+[).\-]\s*", line):
@@ -245,8 +230,17 @@ def extract_recipe(caption: str) -> Recipe:
         elif idx < 2 and len(line.split()) <= 10:
             if title == "Extracted Recipe":
                 title = line.title()
+            else:
+                notes.append(line)
         elif any(token in line_lower for token in ["mix", "bake", "cook", "stir", "serve", "boil", "fry"]):
             steps.append(line)
+        else:
+            notes.append(line)
+
+    if not steps and notes:
+        # If steps were not explicit, preserve useful ordering as simple instructions.
+        steps = [n for n in notes if len(n.split()) > 4]
+        notes = [n for n in notes if n not in steps]
 
     ingredients = [
         item
@@ -258,6 +252,8 @@ def extract_recipe(caption: str) -> Recipe:
         title=title,
         ingredients=ingredients,
         steps=steps,
+        notes=notes,
+        source_caption=cleaned,
     )
 
 
@@ -286,8 +282,6 @@ def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, 
 def _open_template_image() -> Optional[Image.Image]:
     template_upload = request.files.get("template_image")
     if not template_upload or not template_upload.filename:
-        if DEFAULT_TEMPLATE_PATH.exists():
-            return Image.open(DEFAULT_TEMPLATE_PATH).convert("RGBA")
         return None
 
     ext = template_upload.filename.rsplit(".", 1)[-1].lower() if "." in template_upload.filename else ""
@@ -306,152 +300,71 @@ def _open_template_image() -> Optional[Image.Image]:
         raise ValueError("Uploaded template is not a valid image.") from exc
 
 
-def _fetch_thumbnail_image(thumbnail_url: Optional[str]) -> Optional[Image.Image]:
-    if not thumbnail_url:
-        return None
-    parsed = urlparse(thumbnail_url)
-    if parsed.scheme not in {"http", "https"}:
-        return None
-    resp = requests.get(thumbnail_url, timeout=15, headers={"User-Agent": USER_AGENT})
-    resp.raise_for_status()
-    image = Image.open(io.BytesIO(resp.content))
-    image.load()
-    return image.convert("RGBA")
-
-
-def _split_recipe_text(recipe_text: str) -> tuple[str, str]:
-    lines = [line.rstrip() for line in recipe_text.splitlines()]
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    title = lines[0].strip() if lines else "Extracted Recipe"
-    body_lines = lines[1:] if len(lines) > 1 else []
-    body = "\n".join(body_lines).strip()
-    return title, body
-
-
-def _fit_font(
-    draw: ImageDraw.ImageDraw,
-    text: str,
-    max_width: int,
-    max_height: int,
-    start_size: int,
-    min_size: int,
-) -> tuple[ImageFont.ImageFont, List[str], int]:
-    for size in range(start_size, min_size - 1, -2):
-        try:
-            font = ImageFont.truetype("arial.ttf", size)
-        except OSError:
-            font = ImageFont.load_default()
-        lines = _wrap_text(draw, text, font, max_width)
-        line_heights: List[int] = []
-        for line in lines:
-            sample = line or " "
-            bbox = draw.textbbox((0, 0), sample, font=font)
-            line_heights.append((bbox[3] - bbox[1]) + (8 if line else 14))
-        if sum(line_heights) <= max_height:
-            return font, lines, sum(line_heights)
-    font = ImageFont.load_default()
-    lines = _wrap_text(draw, text, font, max_width)
-    line_heights = []
-    for line in lines:
-        sample = line or " "
-        bbox = draw.textbbox((0, 0), sample, font=font)
-        line_heights.append((bbox[3] - bbox[1]) + (8 if line else 14))
-    return font, lines, sum(line_heights)
-
-
-def render_recipe_image(
-    recipe_text: str,
-    template_image: Optional[Image.Image] = None,
-    thumbnail_url: Optional[str] = None,
-) -> io.BytesIO:
-    image = template_image.copy() if template_image is not None else Image.new("RGBA", (1080, 1350), color=(0, 0, 0, 0))
+def render_recipe_image(recipe_text: str, template_image: Optional[Image.Image] = None) -> io.BytesIO:
+    image = template_image.copy() if template_image is not None else Image.new("RGBA", (1080, 1350), color=(249, 245, 236, 255))
     draw = ImageDraw.Draw(image, "RGBA")
     width, height = image.size
 
-    safe_left = int(width * 0.15)
-    safe_top = int(height * 0.11)
-    safe_right = int(width * 0.85)
-    safe_bottom = int(height * 0.92)
-    safe_width = safe_right - safe_left
-    safe_height = safe_bottom - safe_top
+    body_font_size = max(22, int(min(width, height) * 0.032))
+    try:
+        body_font = ImageFont.truetype("arial.ttf", body_font_size)
+    except OSError:
+        body_font = ImageFont.load_default()
 
-    title, body = _split_recipe_text(recipe_text.strip())
-    if not title and not body:
+    max_text_width = int(width * 0.75)
+    wrapped_lines = _wrap_text(draw, recipe_text.strip(), body_font, max_text_width)
+    if not wrapped_lines:
         raise ValueError("No recipe text to render.")
 
-    thumbnail_image = None
-    if thumbnail_url:
-        try:
-            thumbnail_image = _fetch_thumbnail_image(thumbnail_url)
-        except (requests.RequestException, UnidentifiedImageError, OSError, ValueError) as exc:
-            app.logger.warning("Skipping TikTok thumbnail due to fetch/render error: %s", exc)
-            thumbnail_image = None
-
-    thumbnail_reserved_height = int(safe_height * 0.24) if thumbnail_image else 0
-    title_area_height = int(safe_height * 0.2)
-    body_area_top = safe_top + title_area_height
-    body_area_bottom = safe_bottom - thumbnail_reserved_height
-    body_area_height = max(50, body_area_bottom - body_area_top)
-
-    title_font, wrapped_title_lines, title_height = _fit_font(
-        draw=draw,
-        text=title,
-        max_width=int(safe_width * 0.96),
-        max_height=title_area_height,
-        start_size=max(36, int(min(width, height) * 0.065)),
-        min_size=22,
-    )
-
-    body_font, wrapped_body_lines, _ = _fit_font(
-        draw=draw,
-        text=body,
-        max_width=int(safe_width * 0.98),
-        max_height=body_area_height,
-        start_size=max(24, int(min(width, height) * 0.04)),
-        min_size=16,
-    )
-
-    title_y = safe_top + max(6, int((title_area_height - title_height) * 0.5))
-    for line in wrapped_title_lines:
-        sample = line or " "
-        bbox = draw.textbbox((0, 0), sample, font=title_font)
-        line_width = bbox[2] - bbox[0]
-        line_height = bbox[3] - bbox[1]
-        draw.text((safe_left + (safe_width - line_width) // 2, title_y), line, fill=(45, 28, 35, 255), font=title_font)
-        title_y += line_height + (8 if line else 14)
-
-    body_total_height = 0
-    body_line_heights: List[int] = []
-    for line in wrapped_body_lines:
+    line_heights: List[int] = []
+    max_line_width = 0
+    for line in wrapped_lines:
         sample = line or " "
         bbox = draw.textbbox((0, 0), sample, font=body_font)
-        lh = (bbox[3] - bbox[1]) + (6 if line else 12)
-        body_line_heights.append(lh)
-        body_total_height += lh
-    body_y = body_area_top + max(0, (body_area_height - body_total_height) // 2)
+        line_w = bbox[2] - bbox[0]
+        line_h = bbox[3] - bbox[1]
+        max_line_width = max(max_line_width, line_w)
+        line_heights.append(line_h + (8 if line else 16))
 
-    for idx, line in enumerate(wrapped_body_lines):
+    max_text_height = int(height * 0.8)
+    while sum(line_heights) > max_text_height and len(wrapped_lines) > 1:
+        wrapped_lines.pop()
+        line_heights.pop()
+    if sum(line_heights) > max_text_height and wrapped_lines:
+        wrapped_lines = [wrapped_lines[0][:200] + "..."]
+        bbox = draw.textbbox((0, 0), wrapped_lines[0], font=body_font)
+        max_line_width = bbox[2] - bbox[0]
+        line_heights = [bbox[3] - bbox[1]]
+
+    total_text_height = sum(line_heights)
+    y = (height - total_text_height) // 2
+
+    padding_x = max(24, int(width * 0.03))
+    padding_y = max(20, int(height * 0.02))
+    box_left = (width - max_line_width) // 2 - padding_x
+    box_right = (width + max_line_width) // 2 + padding_x
+    box_top = y - padding_y
+    box_bottom = y + total_text_height + padding_y
+    draw.rounded_rectangle(
+        [(box_left, box_top), (box_right, box_bottom)],
+        radius=max(18, int(width * 0.02)),
+        fill=(255, 255, 255, 208),
+        outline=(60, 60, 60, 60),
+        width=2,
+    )
+
+    for idx, line in enumerate(wrapped_lines):
         if not line:
-            body_y += body_line_heights[idx]
+            y += line_heights[idx]
             continue
-        bbox = draw.textbbox((0, 0), line or " ", font=body_font)
+        bbox = draw.textbbox((0, 0), line, font=body_font)
         line_width = bbox[2] - bbox[0]
-        x = safe_left + (safe_width - line_width) // 2
-        draw.text((x, body_y), line, fill=(45, 28, 35, 255), font=body_font)
-        body_y += body_line_heights[idx]
-
-    if thumbnail_image:
-        thumb_max_w = int(safe_width * 0.72)
-        thumb_max_h = int(safe_height * 0.21)
-        thumb = thumbnail_image.copy()
-        thumb.thumbnail((thumb_max_w, thumb_max_h), Image.Resampling.LANCZOS)
-        thumb_x = safe_left + (safe_width - thumb.width) // 2
-        thumb_y = safe_bottom - thumb.height
-        image.alpha_composite(thumb, dest=(thumb_x, thumb_y))
+        x = (width - line_width) // 2
+        draw.text((x, y), line, fill=(30, 30, 30, 255), font=body_font)
+        y += line_heights[idx]
 
     buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
+    image.convert("RGB").save(buffer, format="PNG")
     buffer.seek(0)
     return buffer
 
@@ -464,15 +377,15 @@ def index() -> str:
 @app.route("/extract", methods=["POST"])
 def extract() -> str:
     video_url = normalize_tiktok_url(request.form.get("video_url", ""))
-    metadata = fetch_tiktok_metadata(video_url)
-    recipe = extract_recipe(metadata.caption)
+    caption = fetch_caption_from_tiktok(video_url)
+    recipe = extract_recipe(caption)
     recipe_text = recipe.to_text()
 
     return render_template(
         "index.html",
         video_url=video_url,
+        caption=caption,
         recipe_text=recipe_text,
-        thumbnail_url=metadata.thumbnail_url or "",
     )
 
 
@@ -493,13 +406,8 @@ def download_image():
     recipe_text = request.form.get("recipe_text", "").strip()
     if not recipe_text:
         raise ValueError("No recipe text to render.")
-    thumbnail_url = request.form.get("thumbnail_url", "").strip() or None
     template_image = _open_template_image()
-    image_bytes = render_recipe_image(
-        recipe_text,
-        template_image=template_image,
-        thumbnail_url=thumbnail_url,
-    )
+    image_bytes = render_recipe_image(recipe_text, template_image=template_image)
     return send_file(
         image_bytes,
         mimetype="image/png",
@@ -514,7 +422,6 @@ def handle_exception(error: Exception):
         render_template("index.html", error_message=str(error)),
         400,
     )
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
