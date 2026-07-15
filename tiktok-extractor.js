@@ -33,6 +33,24 @@ const setStatus = (message) => {
   }
 };
 
+const setFetchLoading = (isLoading, label) => {
+  if (!fetchButton) {
+    return;
+  }
+
+  const defaultLabel = fetchButton.getAttribute("data-default-label") || "Extract Metadata";
+  if (isLoading) {
+    fetchButton.classList.add("is-loading");
+    fetchButton.disabled = true;
+    fetchButton.textContent = label || "Working...";
+    return;
+  }
+
+  fetchButton.classList.remove("is-loading");
+  fetchButton.disabled = false;
+  fetchButton.textContent = defaultLabel;
+};
+
 const setupHostedExtractorLink = () => {
   const url = (HOSTED_EXTRACTOR_URL || "").trim();
   if (!url || !hostedExtractorRow || !hostedExtractorLink) {
@@ -43,13 +61,18 @@ const setupHostedExtractorLink = () => {
   hostedExtractorRow.hidden = false;
 };
 
-const openHostedExtractor = (videoUrl = "") => {
+const openHostedExtractor = (videoUrl = "", sameTab = false) => {
   const baseUrl = (HOSTED_EXTRACTOR_URL || "").trim();
   if (!baseUrl || typeof window === "undefined") {
     return false;
   }
 
   const targetUrl = videoUrl ? `${baseUrl}?video_url=${encodeURIComponent(videoUrl)}` : baseUrl;
+  if (sameTab) {
+    window.location.href = targetUrl;
+    return true;
+  }
+
   const opened = window.open(targetUrl, "_blank", "noopener");
   if (!opened) {
     window.location.href = targetUrl;
@@ -576,12 +599,14 @@ const drawRecipeCard = async () => {
 
 const fetchMetadataAndPopulate = async () => {
   if (!videoUrlInput || !recipeInput) {
+    setFetchLoading(false);
     return;
   }
 
   const videoUrl = videoUrlInput.value.trim();
   if (!videoUrl) {
     setStatus("Please enter a TikTok URL first.");
+    setFetchLoading(false);
     return;
   }
 
@@ -590,6 +615,7 @@ const fetchMetadataAndPopulate = async () => {
     normalized = normalizeTikTokUrl(videoUrl);
   } catch (error) {
     setStatus(error.message);
+    setFetchLoading(false);
     return;
   }
 
@@ -612,6 +638,8 @@ const fetchMetadataAndPopulate = async () => {
     if (typeof window !== "undefined" && typeof window.alert === "function") {
       window.alert(message);
     }
+  } finally {
+    setFetchLoading(false);
   }
 };
 
@@ -641,7 +669,20 @@ const clearExtractor = () => {
 };
 
 if (fetchButton) {
+  fetchButton.setAttribute("data-default-label", fetchButton.textContent.trim() || "Extract Metadata");
   fetchButton.addEventListener("click", () => {
+    if (videoUrlInput) {
+      const directUrl = videoUrlInput.value.trim();
+      if (directUrl) {
+        setFetchLoading(true, "Opening hosted extractor...");
+        setStatus("Opening hosted extractor...");
+        if (openHostedExtractor(directUrl, true)) {
+          return;
+        }
+        setFetchLoading(false);
+      }
+    }
+    setFetchLoading(true);
     fetchMetadataAndPopulate();
   });
 }
