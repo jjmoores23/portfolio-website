@@ -15,7 +15,7 @@ const extractorStatus = document.getElementById("extractor-status");
 const hostedExtractorRow = document.getElementById("hosted-extractor-row");
 const hostedExtractorLink = document.getElementById("hosted-extractor-link");
 
-const HOSTED_EXTRACTOR_URL = "";
+const HOSTED_EXTRACTOR_URL = "https://tiktok-recipe-extractor.onrender.com";
 
 const INGREDIENT_QTY_PATTERN = /\b(\d+\/\d+|\d+(?:\.\d+)?|one|two|three|half|quarter)\b/i;
 const INGREDIENT_UNIT_PATTERN =
