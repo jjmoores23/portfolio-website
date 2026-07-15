@@ -43,6 +43,20 @@ const setupHostedExtractorLink = () => {
   hostedExtractorRow.hidden = false;
 };
 
+const openHostedExtractor = (videoUrl = "") => {
+  const baseUrl = (HOSTED_EXTRACTOR_URL || "").trim();
+  if (!baseUrl || typeof window === "undefined") {
+    return false;
+  }
+
+  const targetUrl = videoUrl ? `${baseUrl}?video_url=${encodeURIComponent(videoUrl)}` : baseUrl;
+  const opened = window.open(targetUrl, "_blank", "noopener");
+  if (!opened) {
+    window.location.href = targetUrl;
+  }
+  return true;
+};
+
 const setList = (listElement, items, fallbackText, ordered = false) => {
   if (!listElement) {
     return;
@@ -68,7 +82,7 @@ const normalizeTikTokUrl = (rawUrl) => {
   let parsed;
   try {
     parsed = new URL(trimmed);
-  } catch {
+  } catch (error) {
     throw new Error("Please provide a full TikTok URL starting with http:// or https://.");
   }
 
@@ -541,7 +555,7 @@ const drawRecipeCard = async () => {
       const x = safeLeft + Math.floor((safeWidth - w) / 2);
       const yThumb = safeBottom - h;
       ctx.drawImage(thumbnail, x, yThumb, w, h);
-    } catch {
+    } catch (error) {
       setStatus("Recipe extracted. Thumbnail could not be embedded due to browser image restrictions.");
     }
   }
@@ -587,8 +601,13 @@ const fetchMetadataAndPopulate = async () => {
     setStatus("Metadata fetched successfully. You can now extract.");
   } catch (error) {
     state.thumbnailUrl = "";
-    const message =
-      `Metadata fetch failed (${error.message}). Paste caption text manually and click Extract.`
+    const errorMessage = error && error.message ? error.message : "unknown error";
+    let message =
+      `Metadata fetch failed (${errorMessage}). Paste caption text manually and click Extract.`;
+    if (openHostedExtractor(normalized)) {
+      message =
+        `${message} Opening the hosted extractor for a more reliable mobile experience.`;
+    }
     setStatus(message);
     if (typeof window !== "undefined" && typeof window.alert === "function") {
       window.alert(message);
