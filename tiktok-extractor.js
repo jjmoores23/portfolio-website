@@ -12,6 +12,10 @@ const stepsOutput = document.getElementById("steps-output");
 const notesOutput = document.getElementById("notes-output");
 const recipeOutput = document.getElementById("recipe-output");
 const extractorStatus = document.getElementById("extractor-status");
+const hostedExtractorRow = document.getElementById("hosted-extractor-row");
+const hostedExtractorLink = document.getElementById("hosted-extractor-link");
+
+const HOSTED_EXTRACTOR_URL = "";
 
 const INGREDIENT_QTY_PATTERN = /\b(\d+\/\d+|\d+(?:\.\d+)?|one|two|three|half|quarter)\b/i;
 const INGREDIENT_UNIT_PATTERN =
@@ -27,6 +31,16 @@ const setStatus = (message) => {
   if (extractorStatus) {
     extractorStatus.textContent = message;
   }
+};
+
+const setupHostedExtractorLink = () => {
+  const url = (HOSTED_EXTRACTOR_URL || "").trim();
+  if (!url || !hostedExtractorRow || !hostedExtractorLink) {
+    return;
+  }
+
+  hostedExtractorLink.href = url;
+  hostedExtractorRow.hidden = false;
 };
 
 const setList = (listElement, items, fallbackText, ordered = false) => {
@@ -635,3 +649,5 @@ if (downloadImageButton) {
     drawRecipeCard();
   });
 }
+
+setupHostedExtractorLink();
