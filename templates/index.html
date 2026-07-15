@@ -1,151 +1,158 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TikTok Recipe Extractor | Portfolio</title>
-    <meta
-      name="description"
-      content="Extract ingredients and method steps from TikTok recipe captions or transcripts."
-    />
-    <link rel="stylesheet" href="styles.css" />
+    <title>TikTok Recipe Extractor</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        background: #f6f7fb;
+        color: #222;
+      }
+      .container {
+        max-width: 880px;
+        margin: 40px auto;
+        background: white;
+        border-radius: 14px;
+        padding: 28px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .muted {
+        color: #555;
+      }
+      input[type="url"] {
+        width: 100%;
+        font-size: 16px;
+        padding: 12px;
+        margin-top: 8px;
+        border: 1px solid #cfd3dc;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      input[type="file"] {
+        width: 100%;
+        margin-top: 8px;
+      }
+      button {
+        border: 0;
+        background: #5b45ff;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-top: 12px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      button.secondary {
+        background: #1f7a48;
+      }
+      .error {
+        margin-top: 14px;
+        background: #ffe8e8;
+        color: #8a1414;
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .result {
+        margin-top: 24px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 350px;
+        border: 1px solid #d8dbe3;
+        border-radius: 8px;
+        padding: 10px;
+        box-sizing: border-box;
+        font-family: Consolas, monospace;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .template-card {
+        margin-top: 10px;
+        border: 1px solid #e1e5ef;
+        border-radius: 8px;
+        padding: 10px;
+        background: #fafbff;
+      }
+      .small {
+        font-size: 13px;
+        color: #666;
+      }
+      .caption {
+        margin-bottom: 12px;
+        background: #f6f7ff;
+        border-left: 4px solid #5b45ff;
+        padding: 10px;
+        border-radius: 6px;
+      }
+    </style>
   </head>
-  <body class="project-page">
-    <header class="site-header">
-      <a class="brand" href="index.html">J.M.</a>
-      <a
-        class="header-logo-target"
-        id="brand-logo-target"
-        href="index.html"
-        aria-label="Back to homepage"
-      >
-        <img src="newlogo.png" alt="JM circular logo" />
-      </a>
-      <button
-        class="menu-toggle"
-        id="menu-toggle"
-        type="button"
-        aria-expanded="false"
-        aria-controls="primary-nav"
-      >
-        Menu
-      </button>
-      <nav class="site-nav" id="primary-nav" aria-label="Main">
-        <a href="index.html#about">About</a>
-        <details class="nav-projects" open>
-          <summary>Projects</summary>
-          <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
-            <a href="tiktok-extractor.html" role="menuitem" aria-current="page"
-              >TikTok Recipe Extractor</a
-            >
-          </div>
-        </details>
-        <a href="index.html#work">Work</a>
-        <a href="index.html#writing">Writing</a>
-        <a href="index.html#contact">Contact</a>
-      </nav>
-    </header>
+  <body>
+    <div class="container">
+      <h1>TikTok Recipe Extractor</h1>
+      <p class="muted">
+        Paste a TikTok recipe video URL. The app reads metadata, extracts the recipe-like content,
+        cleans it, and lets you download as text or an image card.
+      </p>
 
-    <main>
-      <section class="section-border page-hero reveal-on-scroll">
-        <p class="kicker">Project</p>
-        <h1>TikTok Recipe Extractor</h1>
-        <p class="lede">
-          Paste a TikTok URL to fetch recipe metadata, or paste caption text
-          directly. The extractor cleans recipe name, ingredients, and
-          instructions, then lets you download text or a recipe card image.
-        </p>
-      </section>
+      <form method="post" action="/extract">
+        <label for="video_url"><strong>TikTok video URL</strong></label>
+        <input
+          id="video_url"
+          name="video_url"
+          type="url"
+          placeholder="https://www.tiktok.com/@username/video/123..."
+          value="{{ video_url or '' }}"
+          required
+        />
+        <button type="submit">Extract Recipe</button>
+      </form>
 
-      <section class="section-border app-grid reveal-on-scroll">
-        <article class="reveal-on-scroll">
-          <label class="field-label" for="video-url">TikTok Video URL</label>
-          <input
-            id="video-url"
-            type="url"
-            placeholder="https://www.tiktok.com/@username/video/123..."
-          />
-          <div class="button-row">
-            <button type="button" id="fetch-button">Extract Metadata</button>
-          </div>
+      {% if error_message %}
+      <div class="error">{{ error_message }}</div>
+      {% endif %}
 
-          <label class="field-label" for="recipe-input">Caption / Source Text</label>
-          <textarea
-            id="recipe-input"
-            placeholder="Paste caption/transcript here if auto-fetch is unavailable."
-          ></textarea>
+      {% if recipe_text %}
+      <div class="result">
+        <h2>Result</h2>
+        <div class="caption">
+          <strong>Raw caption from metadata:</strong><br />
+          {{ caption }}
+        </div>
+        <textarea readonly>{{ recipe_text }}</textarea>
 
-          <div class="button-row">
-            <button type="button" id="extract-button">Extract</button>
-            <button type="button" id="clear-button">Clear</button>
-          </div>
-
-          <p class="helper-text" id="extractor-status">
-            Tip: use a public TikTok URL with a visible caption for best
-            metadata results.
-          </p>
-          <p class="helper-text" id="hosted-extractor-row" hidden>
-            For best mobile reliability, use the hosted backend extractor:
-            <a id="hosted-extractor-link" href="#" target="_blank" rel="noreferrer"
-              >Open hosted extractor</a
-            >.
-          </p>
-        </article>
-        <article class="reveal-on-scroll">
-          <div class="result-block">
-            <h3>Recipe Title</h3>
-            <p id="title-output">Extracted Recipe</p>
-          </div>
-          <div class="result-block">
-            <h3>Ingredients</h3>
-            <ul id="ingredients-output">
-              <li>Paste recipe text and click Extract.</li>
-            </ul>
-          </div>
-          <div class="result-block">
-            <h3>Method</h3>
-            <ol id="steps-output">
-              <li>Steps will appear here.</li>
-            </ol>
-          </div>
-          <div class="result-block">
-            <h3>Notes</h3>
-            <ul id="notes-output">
-              <li>Additional notes will appear here if detected.</li>
-            </ul>
-          </div>
-          <div class="result-block">
-            <h3>Formatted Recipe Text</h3>
-            <textarea id="recipe-output" readonly></textarea>
-            <div class="button-row">
-              <button type="button" id="download-txt-button">Download .txt</button>
+        <div class="actions">
+          <form method="post" action="/download/txt">
+            <input type="hidden" name="recipe_text" value="{{ recipe_text }}" />
+            <button class="secondary" type="submit">Download .txt</button>
+          </form>
+          <form method="post" action="/download/image" enctype="multipart/form-data">
+            <textarea name="recipe_text" style="display: none;">{{ recipe_text }}</textarea>
+            <div class="template-card">
+              <label for="template_image"><strong>Optional: upload recipe card template</strong></label>
+              <input
+                id="template_image"
+                name="template_image"
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+              />
+              <div class="small">
+                Recommended: PNG template. The recipe text will be centered in the middle.
+              </div>
             </div>
-          </div>
-          <div class="result-block">
-            <h3>Recipe Card Image</h3>
-            <label class="field-label" for="template-image"
-              >Optional Template Image (.png, .jpg, .jpeg, .webp)</label
-            >
-            <input
-              id="template-image"
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-            />
-            <div class="button-row">
-              <button type="button" id="download-image-button">
-                Download image card
-              </button>
-            </div>
-          </div>
-        </article>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <p>Moores 2026</p>
-    </footer>
-
-    <script src="script.js"></script>
-    <script src="tiktok-extractor.js"></script>
+            <button class="secondary" type="submit">Download image card</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
   </body>
 </html>
