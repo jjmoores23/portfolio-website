@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TikTok Recipe Extractor | Portfolio</title>
+    <meta
+      name="description"
+      content="Extract ingredients and method steps from TikTok recipe captions or transcripts."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="project-page">
+    <header class="site-header">
+      <a class="brand" href="index.html">J.M.</a>
+      <a
+        class="header-logo-target"
+        id="brand-logo-target"
+        href="index.html"
+        aria-label="Back to homepage"
+      >
+        <img src="newlogo.png" alt="JM circular logo" />
+      </a>
+      <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Main">
+        <a href="index.html#about">About</a>
+        <details class="nav-projects" open>
+          <summary>Projects</summary>
+          <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
+            <a href="tiktok-extractor.html" role="menuitem" aria-current="page"
+              >TikTok Recipe Extractor</a
+            >
+          </div>
+        </details>
+        <a href="index.html#work">Work</a>
+        <a href="index.html#writing">Writing</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="section-border page-hero reveal-on-scroll">
+        <p class="kicker">Project</p>
+        <h1>TikTok Recipe Extractor</h1>
+        <p class="lede">
+          Paste a TikTok URL to fetch recipe metadata, or paste caption text
+          directly. The extractor cleans recipe name, ingredients, and
+          instructions, then lets you download text or a recipe card image.
+        </p>
+      </section>
+
+      <section class="section-border app-grid reveal-on-scroll">
+        <article class="reveal-on-scroll">
+          <label class="field-label" for="video-url">TikTok Video URL</label>
+          <input
+            id="video-url"
+            type="url"
+            placeholder="https://www.tiktok.com/@username/video/123..."
+          />
+          <div class="button-row">
+            <button type="button" id="fetch-button">Fetch Metadata</button>
+          </div>
+
+          <label class="field-label" for="recipe-input">Caption / Source Text</label>
+          <textarea
+            id="recipe-input"
+            placeholder="Paste caption/transcript here if auto-fetch is unavailable."
+          ></textarea>
+
+          <div class="button-row">
+            <button type="button" id="extract-button">Extract</button>
+            <button type="button" id="clear-button">Clear</button>
+          </div>
+
+          <p class="helper-text" id="extractor-status">
+            Tip: use a public TikTok URL with a visible caption for best
+            metadata results.
+          </p>
+        </article>
+        <article class="reveal-on-scroll">
+          <div class="result-block">
+            <h3>Recipe Title</h3>
+            <p id="title-output">Extracted Recipe</p>
+          </div>
+          <div class="result-block">
+            <h3>Ingredients</h3>
+            <ul id="ingredients-output">
+              <li>Paste recipe text and click Extract.</li>
+            </ul>
+          </div>
+          <div class="result-block">
+            <h3>Method</h3>
+            <ol id="steps-output">
+              <li>Steps will appear here.</li>
+            </ol>
+          </div>
+          <div class="result-block">
+            <h3>Notes</h3>
+            <ul id="notes-output">
+              <li>Additional notes will appear here if detected.</li>
+            </ul>
+          </div>
+          <div class="result-block">
+            <h3>Formatted Recipe Text</h3>
+            <textarea id="recipe-output" readonly></textarea>
+            <div class="button-row">
+              <button type="button" id="download-txt-button">Download .txt</button>
+            </div>
+          </div>
+          <div class="result-block">
+            <h3>Recipe Card Image</h3>
+            <label class="field-label" for="template-image"
+              >Optional Template Image (.png, .jpg, .jpeg, .webp)</label
+            >
+            <input
+              id="template-image"
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+            />
+            <div class="button-row">
+              <button type="button" id="download-image-button">
+                Download image card
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Moores 2026</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="tiktok-extractor.js"></script>
+  </body>
+</html>

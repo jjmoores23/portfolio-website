@@ -3,27 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Portfolio Mockup | Computing x Literature</title>
+    <title>Jacob Moores | Portfolio</title>
     <meta
       name="description"
       content="A responsive portfolio mockup blending computing and literature aesthetics."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="home-page">
     <header class="site-header">
       <a class="brand" href="#top" aria-label="Back to top">J.M.</a>
-      <span
+      <a
         class="header-logo-target"
         id="brand-logo-target"
-        aria-hidden="true"
-      ></span>
+        href="#top"
+        aria-label="Back to top"
+      >
+        <img src="newlogo.png" alt="JM circular logo" />
+      </a>
       <button
         class="menu-toggle"
         id="menu-toggle"
@@ -35,6 +32,12 @@
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Main">
         <a href="#about">About</a>
+        <details class="nav-projects">
+          <summary>Projects</summary>
+          <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
+            <a href="tiktok-extractor.html" role="menuitem">TikTok Recipe Extractor</a>
+          </div>
+        </details>
         <a href="#work">Work</a>
         <a href="#writing">Writing</a>
         <a href="#contact">Contact</a>
@@ -44,36 +47,42 @@
       <img
         class="logo-float-image"
         id="logo-float-image"
-        src="logo-clean-gray.png"
-        alt="Interwoven JM logo"
+        src="newlogo.png"
+        alt="JM circular logo"
       />
+      <span class="logo-cursor" aria-hidden="true"></span>
     </a>
 
     <main id="top">
       <section class="landing section-border" aria-label="Landing logo">
-        <p class="kicker">Booting identity...</p>
+        <p class="logo-bootline" id="logo-bootline" aria-live="polite"></p>
         <div class="landing-logo-shell" id="landing-logo-shell" aria-hidden="true"></div>
       </section>
 
       <section class="hero section-border reveal-on-scroll">
-        <p class="kicker">Portfolio Mockup</p>
         <h1>
-          Computing logic.<br />
-          Literary voice.
+          "A little learning is a dang'rous thing;<br />
+          Drink deep, or taste not the Pierian Spring"
         </h1>
-        <p class="lede">
-          A minimal, sharp-edged portfolio concept inspired by editorial layouts
-          and terminal interfaces.
-        </p>
+        <p class="lede">- Alexander Pope</p>
       </section>
 
       <section class="grid-two" id="about">
         <article class="section-border reveal-on-scroll">
           <h2>Profile</h2>
+          <p class="kicker">Jacob Moores: Computer Science Student w/ Minor in English</p>
           <p>
-            I study the architecture of systems and the architecture of
-            language. This site presents projects, essays, and current lines of
-            inquiry.
+            As of this website's last update, I'm a 4th year Bachelors of
+            Science Student, with a Major in Computer Science and Minor in
+            English, from the Memorial University of Newfoundland.
+          </p>
+          <p>
+            My main academic interests revolve around Machine Learning
+            development, Cyber Secuity, data management, and poetry.
+          </p>
+          <p>
+            My non-Academic interests revolve around basketball, music, and
+            audio technology.
           </p>
         </article>
 
@@ -105,9 +114,10 @@ building thoughtful things...
         <div class="card-grid">
           <article class="card reveal-on-scroll">
             <p class="card-label">Project</p>
-            <h3>Compiler Notes</h3>
+            <h3><a href="tiktok-extractor.html">TikTok Recipe Extractor</a></h3>
             <p>
-              A compact visual guide connecting syntax, parsing, and meaning.
+              Paste a TikTok caption/transcript and extract structured ingredients
+              and instructions directly in your browser.
             </p>
           </article>
           <article class="card reveal-on-scroll">
@@ -139,14 +149,15 @@ building thoughtful things...
       <section class="section-border reveal-on-scroll" id="contact">
         <h2>Contact</h2>
         <p>
-          <a href="mailto:you@example.com">you@example.com</a><br />
-          <a href="#">GitHub</a> | <a href="#">LinkedIn</a>
+          <a href="mailto:jjmoores@mun.ca">jjmoores@mun.ca</a><br />
+          <a href="https://github.com/jjmoores23">GitHub</a> |
+          <a href="https://ca.linkedin.com/in/jjmoores">LinkedIn</a>
         </p>
       </section>
     </main>
 
     <footer class="site-footer">
-      <p>(c) 2026 Your Name</p>
+      <p>Moores 2026</p>
     </footer>
 
     <script src="script.js"></script>
