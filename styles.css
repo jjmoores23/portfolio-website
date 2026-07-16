@@ -36,6 +36,13 @@
   --max: 72rem;
 }
 
+body.theme-dark {
+  --bg: #20242b;
+  --text: #e9e6de;
+  --line: #e9e6de;
+  --muted: #b9b4a9;
+}
+
 *,
 *::before,
 *::after {
@@ -86,13 +93,14 @@ main,
   text-decoration: none;
   font-weight: 600;
   z-index: 1;
+  cursor: pointer;
 }
 
 .header-logo-target {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 2.8rem;
+  width: 3.25rem;
   aspect-ratio: 1 / 1;
   transform: translate(-50%, -50%);
   display: inline-flex;
@@ -114,6 +122,10 @@ main,
 .home-page .header-logo-target {
   opacity: 0;
   pointer-events: none;
+}
+
+.project-page .header-logo-target {
+  padding: 4px;
 }
 
 .logo-float {
@@ -294,7 +306,7 @@ main {
   display: grid;
   justify-items: center;
   gap: 0.85rem;
-  min-height: clamp(14rem, 40vh, 23rem);
+  min-height: clamp(12rem, 34vh, 20rem);
 }
 
 .logo-bootline {
@@ -311,7 +323,7 @@ body.logo-render-active .logo-bootline {
 }
 
 .landing-logo-shell {
-  width: min(100%, 30rem);
+  width: min(100%, 24rem);
   aspect-ratio: 1 / 1;
 }
 
@@ -384,6 +396,15 @@ h2 {
   padding: 0.9rem;
 }
 
+.card.card-clickable {
+  cursor: pointer;
+}
+
+.card.card-clickable:focus-visible {
+  outline: 2px solid var(--line);
+  outline-offset: 2px;
+}
+
 .card h3 {
   margin: 0.2rem 0;
 }
@@ -407,6 +428,72 @@ h2 {
   display: grid;
   gap: 1rem;
   grid-template-columns: 1.1fr 0.9fr;
+}
+
+.essay-viewer {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.essay-meta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.essay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.button-link {
+  border: 2px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  padding: 0.35rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.essay-text {
+  width: 100%;
+  min-height: 18rem;
+  border: 2px solid var(--line);
+  background: transparent;
+  padding: 0.8rem;
+  margin: 0;
+  white-space: normal;
+  line-height: 1.6;
+}
+
+.essay-line {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.essay-line + .essay-line {
+  margin-top: 0.35rem;
+}
+
+.essay-line-center {
+  text-align: center;
+}
+
+.essay-line-blank {
+  height: 1rem;
+}
+
+.essay-page .reveal-on-scroll {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 .field-label {

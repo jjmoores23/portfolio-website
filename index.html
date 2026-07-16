@@ -9,10 +9,19 @@
       content="A responsive portfolio mockup blending computing and literature aesthetics."
     />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   </head>
   <body class="home-page">
     <header class="site-header">
-      <a class="brand" href="#top" aria-label="Back to top">J.M.</a>
+      <a
+        class="brand"
+        href="#"
+        aria-label="Toggle color theme"
+        aria-pressed="false"
+        title="Toggle dark mode"
+        >J.M.</a
+      >
       <a
         class="header-logo-target"
         id="brand-logo-target"
@@ -32,6 +41,7 @@
       </button>
       <nav class="site-nav" id="primary-nav" aria-label="Main">
         <a href="#about">About</a>
+        <a href="#resume">Resume</a>
         <details class="nav-projects">
           <summary>Projects</summary>
           <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
@@ -39,7 +49,7 @@
           </div>
         </details>
         <a href="#work">Work</a>
-        <a href="#writing">Writing</a>
+        <a href="#websites">Websites</a>
         <a href="#contact">Contact</a>
       </nav>
     </header>
@@ -54,7 +64,7 @@
     </a>
 
     <main id="top">
-      <section class="landing section-border" aria-label="Landing logo">
+      <section class="landing" aria-label="Landing logo">
         <p class="logo-bootline" id="logo-bootline" aria-live="polite"></p>
         <div class="landing-logo-shell" id="landing-logo-shell" aria-hidden="true"></div>
       </section>
@@ -74,7 +84,9 @@
           <p>
             As of this website's last update, I'm a 4th year Bachelors of
             Science Student, with a Major in Computer Science and Minor in
-            English, from the Memorial University of Newfoundland.
+            English, from the Memorial University of Newfoundland. This website is designed to
+            showcase my academic and personal interests, as well as my work and projects, plus pieces of
+            the internet that I find to be interesting in some way.
           </p>
           <p>
             My main academic interests revolve around Machine Learning
@@ -95,18 +107,39 @@
             <span>bash</span>
           </div>
           <pre><code>$ whoami
-student-researcher
+computer-science-co-op-student
 
 $ interests --list
 - computing
 - literature
-- language design
-- software systems
+- rhyme
+- cyber security
+- machine learning
+- audio equipment
 
 $ status
-building thoughtful things...
+temporary_forever
 </code></pre>
         </article>
+      </section>
+
+      <section class="section-border reveal-on-scroll" id="resume">
+        <h2>Resume</h2>
+        <p class="lede">
+          View or download my current resume in PDF format.
+        </p>
+        <div class="resume-actions">
+          <a
+            class="button-link"
+            href="Jacob%20Moores%20Resume.pdf"
+            target="_blank"
+            rel="noreferrer"
+            >Open Resume</a
+          >
+          <a class="button-link" href="Jacob%20Moores%20Resume.pdf" download
+            >Download Resume</a
+          >
+        </div>
       </section>
 
       <section class="section-border reveal-on-scroll" id="work">
@@ -121,29 +154,118 @@ building thoughtful things...
             </p>
           </article>
           <article class="card reveal-on-scroll">
-            <p class="card-label">Essay</p>
-            <h3>On Reading Code as Text</h3>
+            <p class="card-label">Poem</p>
+            <h3><a href="essay-animal-farm-poem.html">Animal Farm Poem - Rough Copy</a></h3>
             <p>
-              A short piece on interpretation, style, and intention in software.
+              A poetic response to Orwell's world, using imagery and tone to track
+              power, control, and disillusionment.
             </p>
           </article>
           <article class="card reveal-on-scroll">
-            <p class="card-label">Research</p>
-            <h3>Human-Centered Tooling</h3>
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-betrayal-resistance-othello.html"
+                >Betrayal and Resistance Theory Found in Othello</a
+              >
+            </h3>
             <p>
-              Notes on making technical systems more legible and humane.
+              An analysis of betrayal, manipulation, and agency in Othello through
+              resistance-oriented literary theory.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-conformity-insecurity.html"
+                >Conformity is an Expression of Insecurity</a
+              >
+            </h3>
+            <p>
+              A critical argument linking social conformity to fear, uncertainty,
+              and the pressure to perform belonging.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-juxtaposing-characters-imperialism-slavery.html"
+                >Juxtaposing Characters Skills for Navigating British Imperialism
+                and Slavery</a
+              >
+            </h3>
+            <p>
+              A comparative reading of character strategies under imperial and
+              enslaving systems, focused on survival and resistance.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-elimination-general-studies-mun.html"
+                >The Elimination of General Studies at MUN</a
+              >
+            </h3>
+            <p>
+              A position piece on curriculum direction at MUN and what is gained or
+              lost when general studies programs are removed.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-violence-censorship-romanticism.html"
+                >The Gradual Regression of Violence Censorship in Romanticism</a
+              >
+            </h3>
+            <p>
+              An exploration of how censorship around violence shifts across
+              Romantic writing and related cultural contexts.
+            </p>
+          </article>
+          <article class="card reveal-on-scroll">
+            <p class="card-label">Essay</p>
+            <h3>
+              <a href="essay-universal-indifference-impoverished.html"
+                >Universal Indifference Regarding Uplifting the Impoverished</a
+              >
+            </h3>
+            <p>
+              A social critique of public and institutional apathy toward poverty,
+              with emphasis on moral responsibility and action.
             </p>
           </article>
         </div>
       </section>
 
-      <section class="section-border reveal-on-scroll" id="writing">
-        <h2>Writing & Notes</h2>
-        <p>
-          Placeholder for essays, annotation experiments, and reading logs. This
-          section can later host image-based scans, excerpts, and long-form
-          posts.
-        </p>
+      <section class="section-border reveal-on-scroll" id="websites">
+        <h2>Interesting Websites</h2>
+        <ul>
+          <li>
+            <a href="https://martin-manley.eprci.com/" target="_blank" rel="noreferrer"
+              >martin-manley.eprci.com</a
+            >
+          </li>
+          <li>
+            <a href="https://www.spacejam.com/1996/" target="_blank" rel="noreferrer"
+              >spacejam.com/1996</a
+            >
+          </li>
+          <li>
+            <a href="https://www.mcmaster.com/" target="_blank" rel="noreferrer"
+              >mcmaster.com</a
+            >
+          </li>
+          <li>
+            <a href="https://www.canada.ca/en/shared-services/services/gc-ai/canai-garage.html" target="_blank" rel="noreferrer"
+              >canai-garage.html</a
+            >
+          </li>
+          <li>
+            <a href="https://www.canada.ca/en/shared-services/campaigns/stories/canai-garage-unlocking-future-canadas-brightest-minds.html" target="_blank" rel="noreferrer"
+              >canai-garage-unlocking-future-canadas-brightest-minds.html</a
+            >
+          </li>
+        </ul>
       </section>
 
       <section class="section-border reveal-on-scroll" id="contact">

@@ -1,9 +1,13 @@
 const menuToggleButton = document.getElementById("menu-toggle");
 const primaryNav = document.getElementById("primary-nav");
+const siteHeader = document.querySelector(".site-header");
+const brandToggle = document.querySelector(".brand");
+const workCards = document.querySelectorAll("#work .card");
 const landingLogoShell = document.getElementById("landing-logo-shell");
 const logoFloat = document.getElementById("logo-float");
 const logoFloatImage = document.getElementById("logo-float-image");
 const brandLogoTarget = document.getElementById("brand-logo-target");
+const heroSection = document.querySelector(".hero");
 const logoBootLine = document.getElementById("logo-bootline");
 const revealElements = document.querySelectorAll(".reveal-on-scroll");
 const projectMenus = document.querySelectorAll(".nav-projects");
@@ -12,11 +16,107 @@ let logoRenderComplete = false;
 let logoRenderTimer = null;
 let logoCursorTailTimer = null;
 let logoBootTypeTimer = null;
+let introAutoScrollTimer = null;
+let introAutoScrollFrame = null;
+let introAutoScrollDone = false;
+let userInterruptedIntroAutoScroll = false;
 
 const BOOT_LINE_TEXT = "> render_logo --mode=scanline";
+const THEME_STORAGE_KEY = "portfolio-theme";
+const LIGHT_THEME = "light";
+const DARK_THEME = "dark";
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const lerp = (start, end, t) => start + (end - start) * t;
+
+const cancelIntroAutoScroll = () => {
+  userInterruptedIntroAutoScroll = true;
+  if (introAutoScrollTimer) {
+    window.clearTimeout(introAutoScrollTimer);
+    introAutoScrollTimer = null;
+  }
+  if (introAutoScrollFrame) {
+    window.cancelAnimationFrame(introAutoScrollFrame);
+    introAutoScrollFrame = null;
+  }
+};
+
+const animateIntroScrollTo = (targetY, durationMs = 1850) => {
+  const startY = window.scrollY;
+  const distance = targetY - startY;
+
+  if (Math.abs(distance) < 2) {
+    window.scrollTo(0, targetY);
+    return;
+  }
+
+  const startTime = performance.now();
+  const easeInOutSine = (t) => -(Math.cos(Math.PI * t) - 1) / 2;
+
+  const step = (timestamp) => {
+    if (userInterruptedIntroAutoScroll) {
+      introAutoScrollFrame = null;
+      return;
+    }
+
+    const elapsed = timestamp - startTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+    const eased = easeInOutSine(progress);
+    window.scrollTo(0, startY + distance * eased);
+
+    if (progress < 1) {
+      introAutoScrollFrame = window.requestAnimationFrame(step);
+    } else {
+      introAutoScrollFrame = null;
+    }
+  };
+
+  introAutoScrollFrame = window.requestAnimationFrame(step);
+};
+
+const scheduleIntroAutoScroll = () => {
+  if (
+    introAutoScrollDone ||
+    userInterruptedIntroAutoScroll ||
+    !document.body.classList.contains("home-page") ||
+    !heroSection
+  ) {
+    return;
+  }
+
+  introAutoScrollDone = true;
+  introAutoScrollTimer = window.setTimeout(() => {
+    if (userInterruptedIntroAutoScroll || window.scrollY > 6) {
+      return;
+    }
+
+    const headerHeight = siteHeader ? siteHeader.offsetHeight : 0;
+    const heroTop = window.scrollY + heroSection.getBoundingClientRect().top;
+    const targetY = Math.max(0, heroTop - headerHeight - 10);
+    animateIntroScrollTo(targetY);
+  }, 320);
+};
+
+const applyTheme = (theme) => {
+  const isDark = theme === DARK_THEME;
+  document.body.classList.toggle("theme-dark", isDark);
+
+  if (brandToggle) {
+    brandToggle.setAttribute("aria-pressed", String(isDark));
+    brandToggle.setAttribute("title", isDark ? "Toggle light mode" : "Toggle dark mode");
+  }
+};
+
+const getStoredTheme = () => localStorage.getItem(THEME_STORAGE_KEY);
+
+const toggleTheme = () => {
+  const currentTheme = document.body.classList.contains("theme-dark")
+    ? DARK_THEME
+    : LIGHT_THEME;
+  const nextTheme = currentTheme === DARK_THEME ? LIGHT_THEME : DARK_THEME;
+  applyTheme(nextTheme);
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+};
 
 const getMorphProgress = () => {
   const maxScroll = Math.max(window.innerHeight * 0.65, 220);
@@ -69,7 +169,7 @@ const updateLogoPosition = () => {
   document.body.classList.toggle("is-scrolled", progress > 0.02);
 };
 
-const finishLogoRender = ({ withTail = true } = {}) => {
+const finishLogoRender = ({ withTail = true, scheduleAutoScroll = true } = {}) => {
   if (logoRenderTimer) {
     window.clearInterval(logoRenderTimer);
     logoRenderTimer = null;
@@ -101,6 +201,10 @@ const finishLogoRender = ({ withTail = true } = {}) => {
 
   document.body.classList.add("logo-render-complete");
   logoRenderComplete = true;
+
+  if (scheduleAutoScroll) {
+    scheduleIntroAutoScroll();
+  }
 };
 
 const startLogoRender = () => {
@@ -144,7 +248,7 @@ const updateScrollState = () => {
   const isScrolled = getMorphProgress() > 0.02;
 
   if (isScrolled && !logoRenderComplete) {
-    finishLogoRender({ withTail: false });
+    finishLogoRender({ withTail: false, scheduleAutoScroll: false });
   }
 };
 
@@ -213,6 +317,67 @@ if (logoFloat) {
   });
 }
 
+if (document.body.classList.contains("home-page")) {
+  const cancelKeys = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
+
+  window.addEventListener("wheel", cancelIntroAutoScroll, { passive: true });
+  window.addEventListener("touchstart", cancelIntroAutoScroll, { passive: true });
+  window.addEventListener("pointerdown", cancelIntroAutoScroll, { passive: true });
+  window.addEventListener("keydown", (event) => {
+    if (cancelKeys.has(event.key)) {
+      cancelIntroAutoScroll();
+    }
+  });
+}
+
+const storedTheme = getStoredTheme();
+if (storedTheme === DARK_THEME) {
+  applyTheme(DARK_THEME);
+} else {
+  applyTheme(LIGHT_THEME);
+}
+
+if (brandToggle) {
+  brandToggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    toggleTheme();
+  });
+
+  brandToggle.addEventListener("keydown", (event) => {
+    if (event.key === " ") {
+      event.preventDefault();
+      toggleTheme();
+    }
+  });
+}
+
+workCards.forEach((card) => {
+  const label = card.querySelector(".card-label");
+  const link = card.querySelector("h3 a");
+  if (!label || !link || label.textContent.trim().toLowerCase() !== "essay") {
+    return;
+  }
+
+  card.classList.add("card-clickable");
+  card.setAttribute("role", "link");
+  card.tabIndex = 0;
+
+  card.addEventListener("click", (event) => {
+    if (event.target.closest("a")) {
+      return;
+    }
+    window.location.href = link.href;
+  });
+
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    window.location.href = link.href;
+  });
+});
+
 document.body.classList.add("logo-ready");
 
 window.addEventListener("scroll", updateScrollState, { passive: true });
@@ -223,10 +388,14 @@ updateScrollState();
 if (window.scrollY <= 6) {
   startLogoRender();
 } else {
-  finishLogoRender({ withTail: false });
+  finishLogoRender({ withTail: false, scheduleAutoScroll: false });
 }
 
-if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+if (document.body.classList.contains("essay-page")) {
+  revealElements.forEach((element) => {
+    element.classList.add("is-revealed");
+  });
+} else if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
   revealElements.forEach((element) => {
     element.classList.add("is-revealed");
   });
