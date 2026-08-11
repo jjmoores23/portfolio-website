@@ -57,7 +57,7 @@
     </header>
 
     <main>
-      <section class="section-border page-hero reveal-on-scroll">
+      <section class="section-border page-hero">
         <p class="kicker">Project</p>
         <h1>TikTok Recipe Extractor</h1>
         <p class="lede">
@@ -67,8 +67,8 @@
         </p>
       </section>
 
-      <section class="section-border app-grid reveal-on-scroll">
-        <article class="reveal-on-scroll">
+      <section class="section-border app-grid">
+        <article>
           <label class="field-label" for="video-url">TikTok Video URL</label>
           <input
             id="video-url"
@@ -77,6 +77,7 @@
           />
           <div class="button-row">
             <button type="button" id="fetch-button">Extract Metadata</button>
+            <button type="button" id="clear-button">Clear</button>
           </div>
 
           <label class="field-label" for="recipe-input">Caption / Source Text</label>
@@ -87,7 +88,6 @@
 
           <div class="button-row">
             <button type="button" id="extract-button">Extract</button>
-            <button type="button" id="clear-button">Clear</button>
           </div>
 
           <p class="helper-text" id="extractor-status">
@@ -101,7 +101,7 @@
             >.
           </p>
         </article>
-        <article class="reveal-on-scroll">
+        <article>
           <div class="result-block">
             <h3>Recipe Title</h3>
             <p id="title-output">Extracted Recipe</p>
@@ -141,11 +141,20 @@
               type="file"
               accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
             />
+            <p class="helper-text">
+              Leave this empty to use the included pastel border template.
+            </p>
             <div class="button-row">
               <button type="button" id="download-image-button">
                 Download image card
               </button>
+              <button type="button" id="share-image-button">
+                Share / Save to Photos
+              </button>
             </div>
+            <p class="helper-text">
+              On iPhone, use the share sheet's Save Image action to add the card to Photos.
+            </p>
           </div>
         </article>
       </section>

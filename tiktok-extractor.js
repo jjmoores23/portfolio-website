@@ -5,6 +5,7 @@ const extractButton = document.getElementById("extract-button");
 const clearButton = document.getElementById("clear-button");
 const downloadTxtButton = document.getElementById("download-txt-button");
 const downloadImageButton = document.getElementById("download-image-button");
+const shareImageButton = document.getElementById("share-image-button");
 const templateImageInput = document.getElementById("template-image");
 const titleOutput = document.getElementById("title-output");
 const ingredientsOutput = document.getElementById("ingredients-output");
@@ -16,6 +17,9 @@ const hostedExtractorRow = document.getElementById("hosted-extractor-row");
 const hostedExtractorLink = document.getElementById("hosted-extractor-link");
 
 const HOSTED_EXTRACTOR_URL = "https://tiktok-recipe-extractor.onrender.com";
+const LOCAL_API_URL = "http://127.0.0.1:5000";
+const DEFAULT_RECIPE_TEMPLATE_URL = "Cute%20Pastel%20Border%20Design.jpeg";
+const RECIPE_CARD_LOGO_URL = "newlogo.png";
 
 const INGREDIENT_QTY_PATTERN = /\b(\d+\/\d+|\d+(?:\.\d+)?|one|two|three|half|quarter)\b/i;
 const INGREDIENT_UNIT_PATTERN =
@@ -113,7 +117,8 @@ const normalizeTikTokUrl = (rawUrl) => {
     throw new Error("Please provide a full TikTok URL starting with http:// or https://.");
   }
 
-  if (!parsed.hostname.toLowerCase().includes("tiktok.com")) {
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  if (hostname !== "tiktok.com" && !hostname.endsWith(".tiktok.com")) {
     throw new Error("Please provide a TikTok URL.");
   }
 
@@ -121,44 +126,40 @@ const normalizeTikTokUrl = (rawUrl) => {
 };
 
 const fetchTikTokMetadata = async (videoUrl) => {
-  const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(videoUrl)}`;
-  const attempts = [
-    { label: "direct", url: oembedUrl, parseAs: "json" },
-    {
-      label: "allorigins-raw",
-      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(oembedUrl)}`,
-      parseAs: "json"
-    }
-  ];
+  const isLocal = ["", "localhost", "127.0.0.1"].includes(window.location.hostname);
+  const localApiOverride = isLocal
+    ? new URLSearchParams(window.location.search).get("api")
+    : "";
+  const apiBaseUrl = isLocal ? localApiOverride || LOCAL_API_URL : HOSTED_EXTRACTOR_URL;
+  const response = await fetch(`${apiBaseUrl}/api/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ video_url: videoUrl })
+  });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      "The hosted extractor is running an older version without the portfolio API. Deploy the current backend changes."
+    );
+  }
+  const payload = await response.json().catch(() => ({}));
 
-  let lastError = "unknown error";
-
-  for (let i = 0; i < attempts.length; i += 1) {
-    const attempt = attempts[i];
-    try {
-      const response = await fetch(attempt.url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = await response.json();
-      const caption = (payload.title || "").trim();
-      const thumbnailUrl = (payload.thumbnail_url || "").trim();
-      if (!caption) {
-        throw new Error("No caption/title in metadata response.");
-      }
-
-      return { caption, thumbnailUrl };
-    } catch (error) {
-      lastError = `${attempt.label}: ${error.message}`;
-    }
+  if (!response.ok) {
+    throw new Error(payload.error || `Backend returned HTTP ${response.status}.`);
+  }
+  if (!payload.caption) {
+    throw new Error("The backend returned no caption.");
   }
 
-  throw new Error(`Metadata fetch blocked or unavailable (${lastError}).`);
+  return {
+    caption: payload.caption.trim(),
+    thumbnailUrl: (payload.thumbnail_url || "").trim()
+  };
 };
 
 const cleanCaption = (caption) => {
   let cleaned = (caption || "").replace(/\s+/g, " ").trim();
+  cleaned = cleaned.replace(/(?:\s*#[A-Za-z0-9_]+)+\s*$/g, "").trim();
   cleaned = cleaned.replace(/#([A-Za-z0-9_]+)/g, "$1");
   cleaned = cleaned.replace(/@\w+/g, "").trim();
   return cleaned;
@@ -167,7 +168,7 @@ const cleanCaption = (caption) => {
 const splitIntoCandidateLines = (text) => {
   return text
     .split(/(?:\n+|[•\-\u2022]+|\s[|]\s|;)/)
-    .map((part) => part.trim().replace(/[ .,:-\t]+$/g, "").replace(/^[ .,:-\t]+/g, ""))
+    .map((part) => part.trim().replace(/[ .,:\-\t]+$/g, "").replace(/^[ .,:\-\t]+/g, ""))
     .filter(Boolean);
 };
 
@@ -175,28 +176,54 @@ const looksLikeIngredient = (line) =>
   INGREDIENT_QTY_PATTERN.test(line) || INGREDIENT_UNIT_PATTERN.test(line);
 
 const parseIngredientsSection = (sectionText) => {
-  return sectionText
-    .split(/(?:\n+|,|•|\u2022|;)/)
+  const separated = sectionText
+    .replace(/(\bpotatoes?)\s+(?=(?:olive|vegetable|canola)\s+oil\b)/gi, "$1\n")
+    .replace(
+      /(?<!\d)\s+(?=(?:\d+(?:\s+\d+\/\d+|\/\d+|-\d+)?)\s+(?:lb|lbs|tsp|tbsp|oz|cups?|chopped)\b)/gi,
+      "\n"
+    );
+  return separated
+    .split(/(?:\n+|\s{2,}|\s+[-•\u2022]\s+|;|,\s+(?=\d|one\b|two\b|three\b|half\b|quarter\b))/i)
     .map((chunk) => chunk.trim().replace(/^[ .-]+|[ .-]+$/g, ""))
     .filter(Boolean);
 };
 
 const parseStepsSection = (sectionText) => {
-  const numbered = sectionText
-    .split(/(?:^|\s)\d+[).\-]\s*/)
+  const withoutTrailingTags = sectionText
+    .replace(/(?:\s*#[A-Za-z0-9_]+)+\s*$/g, "")
+    .trim();
+  const spaced = withoutTrailingTags
+    .split(/\s{2,}/)
+    .map((part) => part.trim().replace(/^[ .]+|[ .]+$/g, ""))
+    .filter(Boolean);
+  if (spaced.length > 1) {
+    return spaced;
+  }
+
+  const dashed = withoutTrailingTags
+    .split(/\s+[-•\u2022]\s+/)
+    .map((part) => part.trim().replace(/^[ .]+|[ .]+$/g, ""))
+    .filter((part) => /[\p{L}\p{N}]/u.test(part));
+  if (dashed.length > 1) {
+    return dashed;
+  }
+
+  const numbered = withoutTrailingTags
+    .split(/(?:^|\s)\d+[).]\s*/)
     .map((part) => part.trim().replace(/^[ .]+|[ .]+$/g, ""))
     .filter(Boolean);
   if (numbered.length > 1) {
     return numbered;
   }
 
-  return sectionText
+  return withoutTrailingTags
     .split(/(?:\.\s+|;\s+|\n+|•|\u2022)/)
     .map((part) => part.trim().replace(/^[ .]+|[ .]+$/g, ""))
     .filter((part) => part.length > 1);
 };
 
 const extractRecipe = (caption) => {
+  const rawCaption = caption || "";
   const cleaned = cleanCaption(caption);
   const candidates = splitIntoCandidateLines(cleaned);
   const lower = cleaned.toLowerCase();
@@ -206,7 +233,34 @@ const extractRecipe = (caption) => {
     .split(/\bingredients?\b|\binstructions?\b|\bmethod\b|\bdirections?\b|\bsteps?\b/i, 1)[0]
     .trim()
     .replace(/[:\- ]+$/g, "");
-  if (titleFromSections && titleFromSections.split(/\s+/).length >= 2 && titleFromSections.split(/\s+/).length <= 14) {
+  const rawTitlePrefix = rawCaption
+    .split(/\bingredients?\b|\binstructions?\b|\bmethod\b|\bdirections?\b|\bsteps?\b/i, 1)[0]
+    .trim();
+  let explicitHeadingTitle = "";
+  if (rawTitlePrefix.endsWith(":")) {
+    explicitHeadingTitle = rawTitlePrefix
+      .slice(0, -1)
+      .split(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/u)
+      .pop()
+      .split(/[.!?]/)
+      .pop()
+      .trim();
+    const explicitWordCount = explicitHeadingTitle.split(/\s+/).filter(Boolean).length;
+    if (explicitWordCount < 2 || explicitWordCount > 14) {
+      explicitHeadingTitle = "";
+    }
+  }
+  const titleBeforeEmoji = titleFromSections.split(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/u, 1)[0].trim();
+  const promotionalTitle = titleFromSections.match(
+    /\bthis\s+(.{3,80}?)\s+(?:won['’]?t\s+disappoint|will\s+not\s+disappoint)\b/i
+  );
+  if (explicitHeadingTitle) {
+    title = explicitHeadingTitle;
+  } else if (promotionalTitle) {
+    title = promotionalTitle[1].trim().replace(/^[ .,!?:-]+|[ .,!?:-]+$/g, "");
+  } else if (titleBeforeEmoji && titleBeforeEmoji.split(/\s+/).length >= 2 && titleBeforeEmoji.split(/\s+/).length <= 14) {
+    title = titleBeforeEmoji;
+  } else if (titleFromSections && titleFromSections.split(/\s+/).length >= 2 && titleFromSections.split(/\s+/).length <= 14) {
     title = titleFromSections;
   } else {
     const titleMatch = cleaned.match(/^([^.!?]{8,80})/);
@@ -222,16 +276,16 @@ const extractRecipe = (caption) => {
   let ingredientMode = lower.includes("ingredients");
   let stepMode = /instructions|method|directions|steps/.test(lower);
 
-  const ingredientSectionMatch = cleaned.match(
-    /ingredients?\s*[:\-]\s*([\s\S]*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]|$)/i
+  const ingredientSectionMatch = rawCaption.match(
+    /ingredients?\s*[:\-]?\s*([\s\S]*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]?\s|$)/i
   );
   if (ingredientSectionMatch) {
     ingredients = parseIngredientsSection(ingredientSectionMatch[1]);
     ingredientMode = false;
   }
 
-  const stepsSectionMatch = cleaned.match(
-    /(?:instructions?|method|directions?|steps?)\s*[:\-]\s*([\s\S]*)$/i
+  const stepsSectionMatch = rawCaption.match(
+    /(?:instructions?|method|directions?|steps?)\s*[:\-]?\s*([\s\S]*)$/i
   );
   if (stepsSectionMatch) {
     steps = parseStepsSection(stepsSectionMatch[1]);
@@ -432,24 +486,74 @@ const loadImageFromFile = (file) =>
     reader.readAsDataURL(file);
   });
 
-const loadImageFromUrl = (url) =>
+const loadImageFromUrl = (url, errorMessage = "The requested image could not be loaded.") =>
   new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Thumbnail image could not be loaded due to CORS or network restrictions."));
+    img.onerror = () => reject(new Error(errorMessage));
     img.src = url;
   });
 
-const drawRecipeCard = async () => {
-  const recipeText = recipeOutput && recipeOutput.value ? recipeOutput.value.trim() : "";
+const imageOnlyRecipeText = (recipeText) =>
+  (recipeText || "").split(/\nSource Caption\s*\n/i, 1)[0].trim();
+
+const safeRecipeFilename = (title) => {
+  const cleaned = (title || "")
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+  return cleaned && cleaned.toLowerCase() !== "extracted recipe" ? cleaned : "TikTokRecipe";
+};
+
+const drawExtendedTemplate = (ctx, image, targetHeight) => {
+  const width = image.width;
+  if (targetHeight <= image.height) {
+    ctx.drawImage(image, 0, 0, width, image.height);
+    return;
+  }
+
+  const topSlice = Math.floor(image.height * 0.24);
+  const bottomSlice = Math.floor(image.height * 0.22);
+  const middleSourceHeight = image.height - topSlice - bottomSlice;
+  const middleTargetHeight = targetHeight - topSlice - bottomSlice;
+
+  ctx.drawImage(image, 0, 0, width, topSlice, 0, 0, width, topSlice);
+  ctx.drawImage(
+    image,
+    0,
+    topSlice,
+    width,
+    middleSourceHeight,
+    0,
+    topSlice,
+    width,
+    middleTargetHeight
+  );
+  ctx.drawImage(
+    image,
+    0,
+    image.height - bottomSlice,
+    width,
+    bottomSlice,
+    0,
+    targetHeight - bottomSlice,
+    width,
+    bottomSlice
+  );
+};
+
+const createRecipeCard = async () => {
+  const recipeText = imageOnlyRecipeText(
+    recipeOutput && recipeOutput.value ? recipeOutput.value.trim() : ""
+  );
   if (!recipeText) {
     setStatus("Nothing to render yet. Extract a recipe first.");
     return;
   }
 
-  const defaultWidth = 1080;
-  const defaultHeight = 1350;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) {
@@ -458,6 +562,7 @@ const drawRecipeCard = async () => {
   }
 
   let templateImage = null;
+  let usesDefaultTemplate = false;
   const templateFile =
     templateImageInput && templateImageInput.files && templateImageInput.files[0]
       ? templateImageInput.files[0]
@@ -469,132 +574,137 @@ const drawRecipeCard = async () => {
       setStatus(error.message);
       return;
     }
-  }
-
-  canvas.width = templateImage && templateImage.width ? templateImage.width : defaultWidth;
-  canvas.height = templateImage && templateImage.height ? templateImage.height : defaultHeight;
-
-  if (templateImage) {
-    ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
   } else {
-    ctx.fillStyle = "#f3efe6";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    try {
+      templateImage = await loadImageFromUrl(
+        DEFAULT_RECIPE_TEMPLATE_URL,
+        "The default recipe card template could not be loaded."
+      );
+      usesDefaultTemplate = true;
+    } catch (error) {
+      setStatus(error.message);
+      return;
+    }
   }
-
-  const safeLeft = Math.floor(canvas.width * 0.14);
-  const safeTop = Math.floor(canvas.height * 0.1);
-  const safeRight = Math.floor(canvas.width * 0.86);
-  const safeBottom = Math.floor(canvas.height * 0.92);
-  const safeWidth = safeRight - safeLeft;
-  const safeHeight = safeBottom - safeTop;
 
   const [titleLine, ...bodyLines] = recipeText.split("\n");
-  const title = titleLine.trim() || "Extracted Recipe";
+  const title = titleLine.trim() || "TikTokRecipe";
   const bodyText = bodyLines.join("\n").trim();
+  const width = templateImage.width;
+  let logoImage;
+  try {
+    logoImage = await loadImageFromUrl(RECIPE_CARD_LOGO_URL, "The recipe card logo could not be loaded.");
+  } catch (error) {
+    setStatus(error.message);
+    return;
+  }
+  const safeLeft = Math.floor(width * (usesDefaultTemplate ? 0.17 : 0.14));
+  const safeRight = Math.floor(width * (usesDefaultTemplate ? 0.83 : 0.86));
+  const safeWidth = safeRight - safeLeft;
 
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(16, 16, 16, 0.95)";
+  const titleFontSize = Math.max(30, Math.floor(width * 0.046));
+  const bodyFontSize = Math.max(20, Math.floor(width * 0.03));
+  const titleLineHeight = Math.floor(titleFontSize * 1.25);
+  const bodyLineHeight = Math.floor(bodyFontSize * 1.38);
 
-  ctx.font = `${Math.max(42, Math.floor(canvas.width * 0.048))}px "pgLang Roman", "Times New Roman", serif`;
-  let wrappedTitle = wrapCanvasText(ctx, title, Math.floor(safeWidth * 0.95));
-  while (wrappedTitle.length > 4) {
-    ctx.font = `${Math.max(24, parseInt(ctx.font, 10) - 2)}px "pgLang Roman", "Times New Roman", serif`;
-    wrappedTitle = wrapCanvasText(ctx, title, Math.floor(safeWidth * 0.95));
-  }
-
-  const titleFontSize = parseInt(ctx.font, 10);
-  const titleLineHeight = Math.floor(titleFontSize * 1.2);
+  ctx.font = `bold ${titleFontSize}px "Times New Roman", serif`;
+  const wrappedTitle = wrapCanvasText(ctx, title, safeWidth);
   const titleHeight = wrappedTitle.length * titleLineHeight;
+  ctx.font = `${bodyFontSize}px Arial, sans-serif`;
+  const wrappedBody = wrapCanvasText(ctx, bodyText, safeWidth);
+  const bodyHeight = wrappedBody.length * bodyLineHeight;
+  const safeTop = usesDefaultTemplate ? 165 : Math.floor(templateImage.height * 0.1);
+  const logoSize = Math.max(62, Math.floor(width * 0.095));
+  const logoBottomOffset = usesDefaultTemplate
+    ? Math.max(110, Math.floor(width * 0.15))
+    : Math.max(48, Math.floor(width * 0.08));
+  const safeBottomPadding = logoSize + logoBottomOffset + Math.max(36, Math.floor(width * 0.05));
+  const contentGap = Math.floor(bodyLineHeight * 0.7);
+  const requiredHeight = safeTop + titleHeight + contentGap + bodyHeight + safeBottomPadding;
 
-  const thumbnailReserved = state.thumbnailUrl ? Math.floor(safeHeight * 0.23) : 0;
-  const bodyTop = safeTop + Math.floor(safeHeight * 0.2);
-  const bodyBottom = safeBottom - thumbnailReserved;
-  const bodyHeight = Math.max(120, bodyBottom - bodyTop);
+  canvas.width = width;
+  canvas.height = Math.max(templateImage.height, requiredHeight);
+  drawExtendedTemplate(ctx, templateImage, canvas.height);
 
-  ctx.font = `${Math.max(24, Math.floor(canvas.width * 0.026))}px "courier-std", "Courier New", monospace`;
-  let wrappedBody = wrapCanvasText(ctx, bodyText, Math.floor(safeWidth * 0.96));
-  let bodyLineHeight = Math.floor(parseInt(ctx.font, 10) * 1.28);
-  while (wrappedBody.length * bodyLineHeight > bodyHeight && parseInt(ctx.font, 10) > 16) {
-    const nextSize = parseInt(ctx.font, 10) - 2;
-    ctx.font = `${nextSize}px "courier-std", "Courier New", monospace`;
-    wrappedBody = wrapCanvasText(ctx, bodyText, Math.floor(safeWidth * 0.96));
-    bodyLineHeight = Math.floor(nextSize * 1.28);
-  }
-
-  const cardPadding = Math.floor(canvas.width * 0.02);
-  const maxBodyWidth = Math.max(
-    ...wrappedBody.map((line) => Math.ceil(ctx.measureText(line || " ").width)),
-    0
-  );
-  const cardWidth = Math.min(safeWidth, Math.max(maxBodyWidth, Math.ceil(ctx.measureText(title).width)) + cardPadding * 2);
-  const cardLeft = safeLeft + Math.floor((safeWidth - cardWidth) / 2);
-  const cardTop = safeTop + Math.floor((safeHeight - (titleHeight + wrappedBody.length * bodyLineHeight + cardPadding * 3)) / 2);
-  const cardHeight = Math.floor(titleHeight + wrappedBody.length * bodyLineHeight + cardPadding * 3);
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.84)";
-  ctx.strokeStyle = "rgba(16, 16, 16, 0.28)";
-  ctx.lineWidth = 2;
-  if (typeof ctx.roundRect === "function") {
-    ctx.beginPath();
-    ctx.roundRect(cardLeft, cardTop, cardWidth, cardHeight, 18);
-    ctx.fill();
-    ctx.stroke();
-  } else {
-    ctx.fillRect(cardLeft, cardTop, cardWidth, cardHeight);
-    ctx.strokeRect(cardLeft, cardTop, cardWidth, cardHeight);
-  }
-
-  ctx.fillStyle = "rgba(16, 16, 16, 0.95)";
-  ctx.font = `${titleFontSize}px "pgLang Roman", "Times New Roman", serif`;
-  let y = cardTop + cardPadding + titleLineHeight;
+  ctx.fillStyle = "rgba(69, 42, 49, 0.96)";
+  ctx.textAlign = "center";
+  ctx.font = `bold ${titleFontSize}px "Times New Roman", serif`;
+  let y = safeTop + titleLineHeight;
   wrappedTitle.forEach((line) => {
-    const lineWidth = ctx.measureText(line).width;
-    const x = cardLeft + Math.floor((cardWidth - lineWidth) / 2);
-    ctx.fillText(line, x, y);
+    ctx.fillText(line, width / 2, y);
     y += titleLineHeight;
   });
 
-  y += Math.floor(cardPadding * 0.5);
-  ctx.font = `${parseInt(ctx.font, 10) > 0 ? Math.max(16, Math.floor(canvas.width * 0.026)) : 22}px "courier-std", "Courier New", monospace`;
+  y += contentGap;
+  ctx.textAlign = "left";
+  ctx.font = `${bodyFontSize}px Arial, sans-serif`;
   wrappedBody.forEach((line) => {
     if (!line) {
       y += bodyLineHeight;
       return;
     }
-    const lineWidth = ctx.measureText(line).width;
-    const x = cardLeft + Math.floor((cardWidth - lineWidth) / 2);
-    ctx.fillText(line, x, y);
+    ctx.fillText(line, safeLeft, y);
     y += bodyLineHeight;
   });
 
-  if (state.thumbnailUrl) {
-    try {
-      const thumbnail = await loadImageFromUrl(state.thumbnailUrl);
-      const maxThumbW = Math.floor(safeWidth * 0.72);
-      const maxThumbH = Math.floor(safeHeight * 0.2);
-      const ratio = Math.min(maxThumbW / thumbnail.width, maxThumbH / thumbnail.height, 1);
-      const w = Math.floor(thumbnail.width * ratio);
-      const h = Math.floor(thumbnail.height * ratio);
-      const x = safeLeft + Math.floor((safeWidth - w) / 2);
-      const yThumb = safeBottom - h;
-      ctx.drawImage(thumbnail, x, yThumb, w, h);
-    } catch (error) {
-      setStatus("Recipe extracted. Thumbnail could not be embedded due to browser image restrictions.");
-    }
-  }
+  const logoX = Math.floor((canvas.width - logoSize) / 2);
+  const logoY = canvas.height - logoBottomOffset - logoSize;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(canvas.width / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+  ctx.restore();
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) {
     setStatus("Could not create image file.");
     return;
   }
-  const url = URL.createObjectURL(blob);
+  return {
+    blob,
+    filename: `${safeRecipeFilename(title)}.png`,
+    title: safeRecipeFilename(title)
+  };
+};
+
+const downloadRecipeCard = (card, statusMessage = "Recipe card image downloaded.") => {
+  const url = URL.createObjectURL(card.blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "recipe-card.png";
+  link.download = card.filename;
   link.click();
-  URL.revokeObjectURL(url);
-  setStatus("Recipe card image downloaded.");
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  setStatus(statusMessage);
+};
+
+const shareRecipeCard = async (card) => {
+  const file = new File([card.blob], card.filename, { type: "image/png" });
+  const shareData = {
+    files: [file],
+    title: card.title,
+    text: `${card.title} recipe card`
+  };
+
+  if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    try {
+      await navigator.share(shareData);
+      setStatus("Recipe card shared. On iPhone, choose Save Image to add it to Photos.");
+      return;
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        setStatus("Sharing cancelled.");
+        return;
+      }
+      setStatus("The share sheet was unavailable, so the image was downloaded instead.");
+    }
+  }
+
+  downloadRecipeCard(
+    card,
+    "Sharing files is unavailable in this browser, so the image was downloaded instead."
+  );
 };
 
 const fetchMetadataAndPopulate = async () => {
@@ -624,20 +734,13 @@ const fetchMetadataAndPopulate = async () => {
     const metadata = await fetchTikTokMetadata(normalized);
     recipeInput.value = metadata.caption;
     state.thumbnailUrl = metadata.thumbnailUrl || "";
-    setStatus("Metadata fetched successfully. You can now extract.");
+    renderRecipe();
   } catch (error) {
     state.thumbnailUrl = "";
     const errorMessage = error && error.message ? error.message : "unknown error";
-    let message =
+    const message =
       `Metadata fetch failed (${errorMessage}). Paste caption text manually and click Extract.`;
-    if (openHostedExtractor(normalized)) {
-      message =
-        `${message} Opening the hosted extractor for a more reliable mobile experience.`;
-    }
     setStatus(message);
-    if (typeof window !== "undefined" && typeof window.alert === "function") {
-      window.alert(message);
-    }
   } finally {
     setFetchLoading(false);
   }
@@ -671,17 +774,6 @@ const clearExtractor = () => {
 if (fetchButton) {
   fetchButton.setAttribute("data-default-label", fetchButton.textContent.trim() || "Extract Metadata");
   fetchButton.addEventListener("click", () => {
-    if (videoUrlInput) {
-      const directUrl = videoUrlInput.value.trim();
-      if (directUrl) {
-        setFetchLoading(true, "Opening hosted extractor...");
-        setStatus("Opening hosted extractor...");
-        if (openHostedExtractor(directUrl, true)) {
-          return;
-        }
-        setFetchLoading(false);
-      }
-    }
     setFetchLoading(true);
     fetchMetadataAndPopulate();
   });
@@ -702,11 +794,26 @@ if (downloadTxtButton) {
 }
 
 if (downloadImageButton) {
-  downloadImageButton.addEventListener("click", () => {
+  downloadImageButton.addEventListener("click", async () => {
     if (!(recipeOutput && recipeOutput.value && recipeOutput.value.trim())) {
       renderRecipe();
     }
-    drawRecipeCard();
+    const card = await createRecipeCard();
+    if (card) {
+      downloadRecipeCard(card);
+    }
+  });
+}
+
+if (shareImageButton) {
+  shareImageButton.addEventListener("click", async () => {
+    if (!(recipeOutput && recipeOutput.value && recipeOutput.value.trim())) {
+      renderRecipe();
+    }
+    const card = await createRecipeCard();
+    if (card) {
+      await shareRecipeCard(card);
+    }
   });
 }
 

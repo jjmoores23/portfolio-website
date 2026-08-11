@@ -1,28 +1,69 @@
-# TikTok Recipe Extractor (Simple Flask App)
+# Jacob Moores Portfolio
 
-This app takes a TikTok URL, attempts to read caption metadata, and returns only a cleaned recipe name, ingredients, and instructions.
+This repository contains a static portfolio website and a Flask-backed TikTok
+recipe extractor. Recipe text can also be pasted and parsed entirely in the
+browser when TikTok metadata is unavailable.
 
-## Features
-- Paste TikTok video URL
-- Fetch caption from TikTok metadata (`oEmbed` first, HTML meta fallback)
-- Heuristic recipe extraction (recipe name + ingredients + instructions only)
-- Download output as:
-  - `recipe.txt`
-  - `recipe-card.png`
-- Optional custom template upload (`.png`, `.jpg`, `.jpeg`, `.webp`) for image download.
-  If none is uploaded, the included pastel template is used by default.
-- Title is rendered larger near the top of the safe zone, with ingredients/instructions in the middle.
-- If TikTok metadata provides a thumbnail, it is added at the bottom of the safe zone when rendering the card.
+## Local setup
 
-## Run locally
-```powershell
-python -m pip install -r requirements.txt
-python app.py
+Python 3.9–3.13 is recommended. From the repository root:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 ```
 
-Then open:
-`http://127.0.0.1:5000`
+Start the API in one terminal:
 
-## Notes
-- Some TikTok links may block metadata scraping due to anti-bot or region/privacy restrictions.
-- For best results, use public videos with caption text that includes ingredients or steps.
+```sh
+source .venv/bin/activate
+flask --app app run --port 5000
+```
+
+Start the static portfolio in another terminal:
+
+```sh
+python3 -m http.server 8000
+```
+
+Open `http://127.0.0.1:8000/tiktok-extractor.html`.
+
+## How extraction works
+
+The portfolio sends TikTok URLs to `POST /api/extract`. Flask validates the
+hostname and requests TikTok's oEmbed metadata, falling back to HTML metadata.
+It returns the caption, thumbnail URL, structured recipe, and formatted text as
+JSON. Browser-side parsing remains available for manually pasted captions.
+
+Image-card downloads use the extracted recipe title as the filename and default
+to the bundled pastel border when no custom template is selected. Image cards
+contain the formatted recipe but intentionally omit the original source caption.
+On browsers that support sharing files, the Share / Save to Photos button opens
+the device share sheet with the generated PNG. On iPhone, choose Save Image in
+that sheet; browsers without file sharing fall back to a normal download.
+
+The API cannot retrieve private, deleted, region-restricted, or otherwise
+blocked TikTok videos. In those cases, paste the caption or transcript manually.
+
+## Tests
+
+```sh
+source .venv/bin/activate
+pytest -q
+```
+
+With both local servers running, exercise the real Chrome interface against the
+known public TikTok fixture:
+
+```sh
+RUN_E2E=1 pytest tests/test_browser.py -q
+```
+
+## Deployment
+
+`render.yaml` defines the Flask service. The static portfolio currently calls
+`https://tiktok-recipe-extractor.onrender.com` outside local development; update
+`HOSTED_EXTRACTOR_URL` in `tiktok-extractor.js` if the Render service URL changes.
+The backend must be redeployed after adding or changing API routes; the legacy
+HTML `/extract` route cannot be consumed as JSON by the portfolio page.

@@ -3,12 +3,14 @@ import io
 import re
 from dataclasses import dataclass
 from html import unescape
+from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, Response, render_template, request, send_file
+from flask import Flask, Response, jsonify, render_template, request, send_file
+from flask_cors import CORS
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
 
@@ -21,8 +23,17 @@ USER_AGENT = (
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 ALLOWED_TEMPLATE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+DEFAULT_TEMPLATE_PATH = Path(__file__).with_name("Cute Pastel Border Design.jpeg")
+RECIPE_CARD_LOGO_PATH = Path(__file__).with_name("newlogo.png")
+
+
+def _load_default_template() -> Image.Image:
+    with Image.open(DEFAULT_TEMPLATE_PATH) as default_template:
+        default_template.load()
+        return default_template.convert("RGBA")
 
 
 @dataclass
@@ -61,12 +72,13 @@ def normalize_tiktok_url(raw_url: str) -> str:
     parsed = urlparse(raw_url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Please provide a full TikTok URL starting with http:// or https://.")
-    if "tiktok.com" not in parsed.netloc.lower():
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if hostname != "tiktok.com" and not hostname.endswith(".tiktok.com"):
         raise ValueError("Please provide a TikTok URL.")
     return raw_url
 
 
-def fetch_caption_from_tiktok(video_url: str) -> str:
+def fetch_metadata_from_tiktok(video_url: str) -> dict:
     errors: List[str] = []
 
     try:
@@ -80,7 +92,10 @@ def fetch_caption_from_tiktok(video_url: str) -> str:
         oembed = oembed_resp.json()
         title = (oembed.get("title") or "").strip()
         if title:
-            return title
+            return {
+                "caption": title,
+                "thumbnail_url": (oembed.get("thumbnail_url") or "").strip(),
+            }
         errors.append("oEmbed returned no title.")
     except Exception as exc:
         errors.append(f"oEmbed failed: {exc}")
@@ -99,7 +114,15 @@ def fetch_caption_from_tiktok(video_url: str) -> str:
         ]:
             tag = soup.select_one(selector[0])
             if tag and tag.get(selector[1]):
-                return str(tag.get(selector[1])).strip()
+                thumbnail = soup.select_one('meta[property="og:image"]')
+                return {
+                    "caption": str(tag.get(selector[1])).strip(),
+                    "thumbnail_url": (
+                        str(thumbnail.get("content")).strip()
+                        if thumbnail and thumbnail.get("content")
+                        else ""
+                    ),
+                }
 
         errors.append("No usable description metadata found in HTML.")
     except Exception as exc:
@@ -112,9 +135,14 @@ def fetch_caption_from_tiktok(video_url: str) -> str:
     )
 
 
+def fetch_caption_from_tiktok(video_url: str) -> str:
+    return str(fetch_metadata_from_tiktok(video_url)["caption"])
+
+
 def clean_caption(caption: str) -> str:
     cleaned = unescape(caption)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"(?:\s*#[A-Za-z0-9_]+)+\s*$", "", cleaned).strip()
     cleaned = re.sub(r"#([A-Za-z0-9_]+)", r"\1", cleaned)
     cleaned = re.sub(r"@\w+", "", cleaned).strip()
     return cleaned
@@ -139,7 +167,20 @@ def parse_ingredients_section(section_text: str) -> List[str]:
     section_text = section_text.strip(" .")
     if not section_text:
         return []
-    parts = re.split(r"(?:\n+|,|•|\u2022|;)", section_text)
+    section_text = re.sub(
+        r"(?i)(\bpotatoes?)\s+(?=(?:olive|vegetable|canola)\s+oil\b)",
+        r"\1\n",
+        section_text,
+    )
+    section_text = re.sub(
+        r"(?<!\d)\s+(?=(?:\d+(?:\s+\d+/\d+|/\d+|-\d+)?)\s+(?i:lb|lbs|tsp|tbsp|oz|cups?|chopped)\b)",
+        "\n",
+        section_text,
+    )
+    parts = re.split(
+        r"(?:\n+|\s{2,}|\s+[-•\u2022]\s+|;|,\s+(?=(?i:\d|one\b|two\b|three\b|half\b|quarter\b)))",
+        section_text,
+    )
     cleaned = [p.strip(" .-") for p in parts if p.strip(" .-")]
     return cleaned
 
@@ -148,8 +189,23 @@ def parse_steps_section(section_text: str) -> List[str]:
     section_text = section_text.strip(" .")
     if not section_text:
         return []
+    section_text = re.sub(r"(?:\s*#[A-Za-z0-9_]+)+\s*$", "", section_text).strip(" .")
 
-    numbered = re.split(r"(?:^|\s)\d+[).\-]\s*", section_text)
+    spaced = re.split(r"\s{2,}", section_text)
+    spaced = [s.strip(" .") for s in spaced if s.strip(" .")]
+    if len(spaced) > 1:
+        return spaced
+
+    dashed = re.split(r"\s+[-•\u2022]\s+", section_text)
+    dashed = [
+        s.strip(" .")
+        for s in dashed
+        if s.strip(" .") and re.search(r"\w", s, flags=re.UNICODE)
+    ]
+    if len(dashed) > 1:
+        return dashed
+
+    numbered = re.split(r"(?:^|\s)\d+[).]\s*", section_text)
     numbered = [s.strip(" .") for s in numbered if s.strip(" .")]
     if len(numbered) > 1:
         return numbered
@@ -159,14 +215,56 @@ def parse_steps_section(section_text: str) -> List[str]:
 
 
 def extract_recipe(caption: str) -> Recipe:
+    raw_caption = unescape(caption or "").strip()
     cleaned = clean_caption(caption)
     candidates = split_into_candidate_lines(cleaned)
 
     lower = cleaned.lower()
     title = "Extracted Recipe"
-    title_match = re.match(r"^([^.!?]{8,80})", cleaned)
-    if title_match:
-        title = title_match.group(1).strip().title()
+    title_from_sections = re.split(
+        r"\b(?:ingredients?|instructions?|method|directions?|steps?)\b",
+        cleaned,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip(" :-")
+    raw_title_prefix = re.split(
+        r"\b(?:ingredients?|instructions?|method|directions?|steps?)\b",
+        raw_caption,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+    explicit_heading_title = ""
+    if raw_title_prefix.endswith(":"):
+        explicit_heading_title = raw_title_prefix[:-1].strip()
+        explicit_heading_title = re.split(
+            r"[\u2600-\u27BF\U0001F300-\U0001FAFF]",
+            explicit_heading_title,
+        )[-1].strip()
+        explicit_heading_title = re.split(r"[.!?]", explicit_heading_title)[-1].strip()
+        if not 2 <= len(explicit_heading_title.split()) <= 14:
+            explicit_heading_title = ""
+    title_before_emoji = re.split(
+        r"[\u2600-\u27BF\U0001F300-\U0001FAFF]",
+        title_from_sections,
+        maxsplit=1,
+    )[0].strip()
+    promotional_title = re.search(
+        r"\bthis\s+(.{3,80}?)\s+(?:won['’]?t\s+disappoint|will\s+not\s+disappoint)\b",
+        title_from_sections,
+        flags=re.IGNORECASE,
+    )
+    if explicit_heading_title:
+        title = explicit_heading_title
+    elif promotional_title:
+        title = promotional_title.group(1).strip(" .,!?:-")
+    elif 2 <= len(title_before_emoji.split()) <= 14:
+        title = title_before_emoji
+    elif 2 <= len(title_from_sections.split()) <= 14:
+        title = title_from_sections
+    else:
+        title_match = re.match(r"^([^.!?]{8,80})", cleaned)
+        if title_match:
+            title = title_match.group(1).strip().title()
 
     ingredients: List[str] = []
     steps: List[str] = []
@@ -176,8 +274,8 @@ def extract_recipe(caption: str) -> Recipe:
     step_mode = any(token in lower for token in ["instructions", "method", "directions", "steps"])
 
     ingredient_section_match = re.search(
-        r"ingredients?\s*[:\-]\s*(.*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]|$)",
-        cleaned,
+        r"ingredients?\s*[:\-]?\s*(.*?)(?=(?:instructions?|method|directions?|steps?)\s*[:\-]?\s|$)",
+        raw_caption,
         flags=re.IGNORECASE | re.DOTALL,
     )
     if ingredient_section_match:
@@ -185,8 +283,8 @@ def extract_recipe(caption: str) -> Recipe:
         ingredient_mode = False
 
     steps_section_match = re.search(
-        r"(?:instructions?|method|directions?|steps?)\s*[:\-]\s*(.*)$",
-        cleaned,
+        r"(?:instructions?|method|directions?|steps?)\s*[:\-]?\s*(.*)$",
+        raw_caption,
         flags=re.IGNORECASE | re.DOTALL,
     )
     if steps_section_match:
@@ -283,7 +381,7 @@ def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, 
 def _open_template_image() -> Optional[Image.Image]:
     template_upload = request.files.get("template_image")
     if not template_upload or not template_upload.filename:
-        return None
+        return _load_default_template()
 
     ext = template_upload.filename.rsplit(".", 1)[-1].lower() if "." in template_upload.filename else ""
     if ext not in ALLOWED_TEMPLATE_EXTENSIONS:
@@ -301,68 +399,117 @@ def _open_template_image() -> Optional[Image.Image]:
         raise ValueError("Uploaded template is not a valid image.") from exc
 
 
+def _image_only_recipe_text(recipe_text: str) -> str:
+    return re.split(r"\nSource Caption\s*\n", recipe_text, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+
+
+def _safe_recipe_filename(title: str) -> str:
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", title or "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(". ")
+    return cleaned if cleaned and cleaned.lower() != "extracted recipe" else "TikTokRecipe"
+
+
+def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    candidates = [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for candidate in candidates:
+        try:
+            return ImageFont.truetype(candidate, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def _extend_template(template: Image.Image, target_height: int) -> Image.Image:
+    width, source_height = template.size
+    if target_height <= source_height:
+        return template.copy()
+
+    top_slice = int(source_height * 0.24)
+    bottom_slice = int(source_height * 0.22)
+    middle = template.crop((0, top_slice, width, source_height - bottom_slice))
+    middle = middle.resize(
+        (width, target_height - top_slice - bottom_slice),
+        Image.Resampling.LANCZOS,
+    )
+    result = Image.new("RGBA", (width, target_height))
+    result.paste(template.crop((0, 0, width, top_slice)), (0, 0))
+    result.paste(middle, (0, top_slice))
+    result.paste(
+        template.crop((0, source_height - bottom_slice, width, source_height)),
+        (0, target_height - bottom_slice),
+    )
+    return result
+
+
+def _add_recipe_card_logo(image: Image.Image, size: int, bottom_offset: int) -> None:
+    with Image.open(RECIPE_CARD_LOGO_PATH) as logo_source:
+        logo = logo_source.convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+    x = (image.width - size) // 2
+    y = image.height - bottom_offset - size
+    image.paste(logo, (x, y), mask)
+
+
 def render_recipe_image(recipe_text: str, template_image: Optional[Image.Image] = None) -> io.BytesIO:
-    image = template_image.copy() if template_image is not None else Image.new("RGBA", (1080, 1350), color=(249, 245, 236, 255))
-    draw = ImageDraw.Draw(image, "RGBA")
-    width, height = image.size
+    template = template_image.copy() if template_image is not None else _load_default_template()
+    if template is None:
+        raise ValueError("The default recipe card template could not be loaded.")
 
-    body_font_size = max(22, int(min(width, height) * 0.032))
-    try:
-        body_font = ImageFont.truetype("arial.ttf", body_font_size)
-    except OSError:
-        body_font = ImageFont.load_default()
-
-    max_text_width = int(width * 0.75)
-    wrapped_lines = _wrap_text(draw, recipe_text.strip(), body_font, max_text_width)
-    if not wrapped_lines:
+    image_text = _image_only_recipe_text(recipe_text)
+    if not image_text:
         raise ValueError("No recipe text to render.")
 
-    line_heights: List[int] = []
-    max_line_width = 0
-    for line in wrapped_lines:
-        sample = line or " "
-        bbox = draw.textbbox((0, 0), sample, font=body_font)
-        line_w = bbox[2] - bbox[0]
-        line_h = bbox[3] - bbox[1]
-        max_line_width = max(max_line_width, line_w)
-        line_heights.append(line_h + (8 if line else 16))
+    title, *body_parts = image_text.splitlines()
+    title = title.strip() or "TikTokRecipe"
+    body_text = "\n".join(body_parts).strip()
+    width = template.width
+    safe_left = int(width * 0.17)
+    safe_width = int(width * 0.66)
+    title_font_size = max(30, int(width * 0.046))
+    body_font_size = max(20, int(width * 0.03))
+    title_font = _load_font(title_font_size, bold=True)
+    body_font = _load_font(body_font_size)
 
-    max_text_height = int(height * 0.8)
-    while sum(line_heights) > max_text_height and len(wrapped_lines) > 1:
-        wrapped_lines.pop()
-        line_heights.pop()
-    if sum(line_heights) > max_text_height and wrapped_lines:
-        wrapped_lines = [wrapped_lines[0][:200] + "..."]
-        bbox = draw.textbbox((0, 0), wrapped_lines[0], font=body_font)
-        max_line_width = bbox[2] - bbox[0]
-        line_heights = [bbox[3] - bbox[1]]
-
-    total_text_height = sum(line_heights)
-    y = (height - total_text_height) // 2
-
-    padding_x = max(24, int(width * 0.03))
-    padding_y = max(20, int(height * 0.02))
-    box_left = (width - max_line_width) // 2 - padding_x
-    box_right = (width + max_line_width) // 2 + padding_x
-    box_top = y - padding_y
-    box_bottom = y + total_text_height + padding_y
-    draw.rounded_rectangle(
-        [(box_left, box_top), (box_right, box_bottom)],
-        radius=max(18, int(width * 0.02)),
-        fill=(255, 255, 255, 208),
-        outline=(60, 60, 60, 60),
-        width=2,
+    measuring_draw = ImageDraw.Draw(template)
+    title_lines = _wrap_text(measuring_draw, title, title_font, safe_width)
+    body_lines = _wrap_text(measuring_draw, body_text, body_font, safe_width)
+    title_line_height = int(title_font_size * 1.25)
+    body_line_height = int(body_font_size * 1.38)
+    safe_top = 165
+    content_gap = int(body_line_height * 0.7)
+    logo_size = max(62, int(width * 0.095))
+    logo_bottom_offset = max(110, int(width * 0.15))
+    safe_bottom_padding = logo_size + logo_bottom_offset + max(36, int(width * 0.05))
+    required_height = (
+        safe_top
+        + len(title_lines) * title_line_height
+        + content_gap
+        + len(body_lines) * body_line_height
+        + safe_bottom_padding
     )
 
-    for idx, line in enumerate(wrapped_lines):
-        if not line:
-            y += line_heights[idx]
-            continue
-        bbox = draw.textbbox((0, 0), line, font=body_font)
-        line_width = bbox[2] - bbox[0]
-        x = (width - line_width) // 2
-        draw.text((x, y), line, fill=(30, 30, 30, 255), font=body_font)
-        y += line_heights[idx]
+    image = _extend_template(template, max(template.height, required_height))
+    draw = ImageDraw.Draw(image, "RGBA")
+    y = safe_top
+    text_color = (69, 42, 49, 245)
+
+    for line in title_lines:
+        bbox = draw.textbbox((0, 0), line, font=title_font)
+        x = (width - (bbox[2] - bbox[0])) // 2
+        draw.text((x, y), line, fill=text_color, font=title_font)
+        y += title_line_height
+
+    y += content_gap
+    for line in body_lines:
+        if line:
+            draw.text((safe_left, y), line, fill=text_color, font=body_font)
+        y += body_line_height
+
+    _add_recipe_card_logo(image, logo_size, logo_bottom_offset)
 
     buffer = io.BytesIO()
     image.convert("RGB").save(buffer, format="PNG")
@@ -390,6 +537,31 @@ def extract() -> str:
     )
 
 
+@app.route("/api/extract", methods=["POST"])
+def api_extract():
+    payload = request.get_json(silent=True) or request.form
+    video_url = normalize_tiktok_url(payload.get("video_url", ""))
+    metadata = fetch_metadata_from_tiktok(video_url)
+    caption = str(metadata["caption"])
+    recipe = extract_recipe(caption)
+
+    return jsonify(
+        {
+            "video_url": video_url,
+            "caption": caption,
+            "thumbnail_url": metadata.get("thumbnail_url", ""),
+            "recipe": {
+                "title": recipe.title,
+                "ingredients": recipe.ingredients,
+                "steps": recipe.steps,
+                "notes": recipe.notes,
+                "source_caption": recipe.source_caption,
+            },
+            "recipe_text": recipe.to_text(),
+        }
+    )
+
+
 @app.route("/download/txt", methods=["POST"])
 def download_txt() -> Response:
     recipe_text = request.form.get("recipe_text", "").strip()
@@ -413,12 +585,14 @@ def download_image():
         image_bytes,
         mimetype="image/png",
         as_attachment=True,
-        download_name="recipe-card.png",
+        download_name=f"{_safe_recipe_filename(_image_only_recipe_text(recipe_text).splitlines()[0])}.png",
     )
 
 
 @app.errorhandler(Exception)
 def handle_exception(error: Exception):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": str(error)}), 400
     return (
         render_template("index.html", error_message=str(error)),
         400,
