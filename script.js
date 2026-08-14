@@ -25,6 +25,7 @@ const BOOT_LINE_TEXT = "> render_logo --mode=scanline";
 const THEME_STORAGE_KEY = "portfolio-theme";
 const LIGHT_THEME = "light";
 const DARK_THEME = "dark";
+const PORTFOLIO_GUIDE_REVEAL_SCROLL_Y = 160;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const lerp = (start, end, t) => start + (end - start) * t;
@@ -169,6 +170,17 @@ const updateLogoPosition = () => {
   document.body.classList.toggle("is-scrolled", progress > 0.02);
 };
 
+const updatePortfolioGuideVisibility = () => {
+  if (!document.body.classList.contains("home-page")) {
+    return;
+  }
+
+  document.body.classList.toggle(
+    "portfolio-guide-visible",
+    window.scrollY >= PORTFOLIO_GUIDE_REVEAL_SCROLL_Y
+  );
+};
+
 const finishLogoRender = ({ withTail = true, scheduleAutoScroll = true } = {}) => {
   if (logoRenderTimer) {
     window.clearInterval(logoRenderTimer);
@@ -245,6 +257,7 @@ const startLogoRender = () => {
 
 const updateScrollState = () => {
   updateLogoPosition();
+  updatePortfolioGuideVisibility();
   const isScrolled = getMorphProgress() > 0.02;
 
   if (isScrolled && !logoRenderComplete) {

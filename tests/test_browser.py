@@ -6,10 +6,62 @@ from playwright.sync_api import sync_playwright
 
 
 CHROME_PATH = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+PORTFOLIO_URL = "http://127.0.0.1:8000/index.html"
 EXTRACTOR_URL = "http://127.0.0.1:8000/tiktok-extractor.html?api=http://127.0.0.1:5055"
 TIKTOK_URL = "https://vt.tiktok.com/ZSXhRCN9p/"
 SLOPPY_JOE_URL = "https://vt.tiktok.com/ZS434t6W7/"
 CREAMY_CHICKEN_PASTA_URL = "https://vt.tiktok.com/ZS43VX9Dd/"
+
+
+@pytest.mark.skipif(
+    os.environ.get("RUN_E2E_WIDGET") != "1",
+    reason="Set RUN_E2E_WIDGET=1 after starting the static server.",
+)
+def test_portfolio_guide_widget_is_homepage_only():
+    page_errors = []
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            executable_path=str(CHROME_PATH),
+            headless=True,
+        )
+        page = browser.new_page()
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
+        page.goto(PORTFOLIO_URL, wait_until="domcontentloaded")
+        page.locator("#mcp-widget-host").wait_for(timeout=15_000)
+
+        widget_state = page.evaluate(
+            """() => {
+                const host = document.querySelector("#mcp-widget-host");
+                const shadow = host?.shadowRoot;
+                const launcher = shadow?.querySelector(".fab");
+                launcher?.click();
+
+                return {
+                    disclosure: document.querySelector(".portfolio-guide-note")?.textContent,
+                    localScript: [...document.scripts].some(
+                        (script) => script.src.endsWith("/widget.js")
+                    ),
+                    launcherPresent: Boolean(launcher),
+                    launcherImage: shadow?.querySelector(".launcher-logo")?.getAttribute("src"),
+                    windowOpen: shadow?.querySelector(".window")?.classList.contains("open"),
+                    name: shadow?.querySelector(".header-title")?.textContent,
+                    expanded: launcher?.getAttribute("aria-expanded"),
+                };
+            }"""
+        )
+        assert "external AI service" in widget_state["disclosure"]
+        assert widget_state["localScript"]
+        assert widget_state["launcherPresent"]
+        assert widget_state["launcherImage"] == "newlogo.png"
+        assert widget_state["windowOpen"]
+        assert widget_state["name"] == "Portfolio Guide"
+        assert widget_state["expanded"] == "true"
+        assert not page_errors
+
+        page.goto(EXTRACTOR_URL, wait_until="domcontentloaded")
+        assert not page.locator("#mcp-widget-host").count()
+        browser.close()
 
 
 @pytest.mark.skipif(

@@ -331,10 +331,27 @@ body.logo-render-active .logo-float-image {
   clip-path: inset(0 0 var(--logo-clip-bottom, 100%) 0);
 }
 
+.home-page #mcp-widget-host {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1rem);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.home-page.portfolio-guide-visible #mcp-widget-host {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll {
     opacity: 1;
     transform: none;
+    transition: none;
+  }
+
+  .home-page #mcp-widget-host {
     transition: none;
   }
 }
@@ -460,6 +477,20 @@ h2 {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.resume-highlights {
+  border-top: 2px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+}
+
+.resume-highlights h3 {
+  margin: 0 0 0.5rem;
+}
+
+.resume-highlights p {
+  margin: 0.5rem 0 0;
 }
 
 .essay-text {
@@ -597,6 +628,17 @@ button.is-loading::after {
   margin: 0;
 }
 
+.portfolio-guide-note {
+  border-top: 2px solid var(--line);
+  color: var(--muted);
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+}
+
+.portfolio-guide-note strong {
+  color: var(--text);
+}
+
 .site-footer {
   border-top: 2px solid var(--line);
   padding: 0.8rem 0 2rem;
@@ -617,6 +659,10 @@ button.is-loading::after {
 }
 
 @media (max-width: 700px) {
+  .home-page .site-footer {
+    padding-bottom: 6.5rem;
+  }
+
   .menu-toggle {
     display: inline-block;
   }
