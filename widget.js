@@ -35,6 +35,12 @@
     },
   };
   const _ls = LANG_STRINGS[scriptTag?.dataset.lang] || LANG_STRINGS.en;
+  const SUGGESTED_QUESTIONS = [
+    "What projects has Jacob built?",
+    "Summarize Jacob's essays.",
+    "What can the TikTok Recipe Extractor do?",
+    "Tell me a fun fact.",
+  ];
 
   const cfg = {
     backendUrl: (scriptTag?.dataset.backendUrl || "ws://localhost:8000").replace(/\/$/, ""),
@@ -42,6 +48,9 @@
     // data-info-url: separate URL for knowledge crawling (e.g. main site).
     // Defaults to targetUrl when not set.
     infoUrl: scriptTag?.dataset.infoUrl || scriptTag?.dataset.targetUrl || "",
+    // The backend should answer portfolio questions first, then use its general
+    // knowledge for safe non-portfolio questions. Set to "false" to opt out.
+    allowGeneralKnowledge: scriptTag?.dataset.generalKnowledge !== "false",
     businessName: scriptTag?.dataset.businessName || "Business Assistant",
     lang: scriptTag?.dataset.lang || "en",
     primaryColor: scriptTag?.dataset.primaryColor || "#1246D6",
@@ -60,6 +69,12 @@
     sessionStorage.setItem(SESSION_KEY, sessionId);
   }
 
+  const CONVERSATION_STORAGE_KEY = `mcp_widget_conversation:${cfg.businessName}`;
+  const navigationEntry = performance.getEntriesByType("navigation")[0];
+  if (navigationEntry?.type === "reload") {
+    sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+  }
+
   // -------------------------------------------------------------------------
   // Build Shadow DOM host element
   // -------------------------------------------------------------------------
@@ -68,7 +83,7 @@
   Object.assign(host.style, {
     position: "fixed",
     zIndex: "2147483647",
-    bottom: "24px",
+    bottom: "calc(24px + env(safe-area-inset-bottom))",
     [cfg.position === "bottom-left" ? "left" : "right"]: "24px",
     fontFamily: '"courier-std", "Courier New", monospace',
   });
@@ -175,7 +190,42 @@
     .message.user .message-body { border-left: 0; border-right: 2px solid var(--guide-line); padding-left: 0; padding-right: 0.55rem; text-align: right; }
     .message.user .message-label { text-align: right; }
     .message a { color: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+    .message strong { font-weight: 700; }
+    .message code {
+      border: 1px solid var(--guide-line);
+      font-family: inherit;
+      font-size: 0.76rem;
+      padding: 0.05rem 0.2rem;
+    }
+    .message-heading { display: inline-block; margin-top: 0.15rem; }
     .message.typing .message-body { color: var(--guide-muted); }
+
+    .suggestions {
+      border-top: 2px solid var(--guide-line);
+      display: grid;
+      gap: 0.4rem;
+      padding: 0.65rem 0.75rem;
+    }
+    .suggestions[hidden] { display: none; }
+    .suggestions-label {
+      color: var(--guide-muted);
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
+    .suggestion-btn {
+      background: transparent;
+      border: 1px solid var(--guide-line);
+      color: var(--guide-text);
+      font-size: 0.72rem;
+      padding: 0.42rem 0.5rem;
+      text-align: left;
+    }
+    .suggestion-btn:hover,
+    .suggestion-btn:focus-visible {
+      background: var(--guide-text);
+      color: var(--guide-bg);
+    }
+    .suggestion-btn:disabled { cursor: wait; opacity: 0.6; }
 
     .disclaimer {
       border-top: 2px solid var(--guide-line);
@@ -215,6 +265,18 @@
 
     .powered { color: var(--guide-muted); font-size: 0.66rem; padding: 0 0.65rem 0.55rem; }
 
+    /* Mobile Safari/Chrome zoom focused inputs below 16px automatically. */
+    @media (max-width: 600px) {
+      .input-row input {
+        font-size: 16px;
+        line-height: 1.25;
+      }
+    }
+
+    @supports (height: 100dvh) {
+      .window { max-height: min(560px, calc(100dvh - 112px)); }
+    }
+
     @media (max-width: 420px) {
       .fab { height: 52px; width: 52px; }
       .launcher-label { display: none; }
@@ -230,21 +292,38 @@
   // -------------------------------------------------------------------------
   // DOM structure
   // -------------------------------------------------------------------------
+  const suggestionsMarkup = SUGGESTED_QUESTIONS.map(
+    (question) =>
+      `<button class="suggestion-btn" type="button" data-question="${escHtml(question)}">${escHtml(question)}</button>`
+  ).join("");
   const container = document.createElement("div");
   container.innerHTML = `
-    <div class="window" id="chat-window">
+    <div
+      class="window"
+      id="chat-window"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+      inert
+      aria-labelledby="chat-title"
+      aria-describedby="chat-disclaimer"
+    >
       <div class="header">
         <div class="header-avatar"><img src="${escHtml(cfg.logoUrl)}" alt="" /></div>
         <div class="header-copy">
-          <div class="header-title">${escHtml(cfg.businessName)}</div>
+          <div class="header-title" id="chat-title">${escHtml(cfg.businessName)}</div>
           <div class="header-subtitle">site navigator</div>
         </div>
         <button class="header-close" id="close-btn" type="button" aria-label="Close Portfolio Guide">x</button>
       </div>
-      <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+      <div class="messages" id="messages" role="log" aria-live="polite" aria-atomic="false" aria-busy="false" aria-relevant="additions text"></div>
+      <div class="suggestions" id="suggestions" aria-label="Suggested questions">
+        <span class="suggestions-label">Try asking:</span>
+        ${suggestionsMarkup}
+      </div>
       <div class="disclaimer" id="chat-disclaimer">EXTERNAL AI SERVICE. Do not share private, financial, or sensitive information.</div>
       <div class="input-row">
-        <input type="text" id="user-input" aria-label="Ask Portfolio Guide" placeholder="${escHtml(_ls.placeholder)}" />
+        <input type="text" id="user-input" aria-label="Ask Portfolio Guide" placeholder="${escHtml(_ls.placeholder)}" autocomplete="off" enterkeyhint="send" />
         <button class="send-btn" id="send-btn" type="button" aria-label="Send question">ASK</button>
       </div>
       <div class="powered">PORTFOLIO GUIDE / EXTERNAL AI</div>
@@ -258,6 +337,7 @@
 
   const chatWindow = shadow.getElementById("chat-window");
   const messagesEl = shadow.getElementById("messages");
+  const suggestionsEl = shadow.getElementById("suggestions");
   const userInput = shadow.getElementById("user-input");
   const sendBtn = shadow.getElementById("send-btn");
   const fabBtn = shadow.getElementById("fab-btn");
@@ -280,22 +360,138 @@
     return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
-  // Render plain text to safe HTML with clickable links and line breaks.
-  function renderText(text) {
-    const escaped = escHtml(text);
-    // Linkify URLs (http/https)
-    const linked = escaped.replace(
-      /(https?:\/\/[^\s<>"']+?)([)\].,;!?]*(?:\s|$))/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>$2'
+  function safeLink(url, label) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return escHtml(label);
+      }
+      return `<a href="${escHtml(parsed.href)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
+    } catch {
+      return escHtml(label);
+    }
+  }
+
+  function renderInlineText(text) {
+    const markdownLinks = [];
+    const withLinkTokens = String(text).replace(
+      /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      (_match, label, url) => {
+        const token = `@@PORTFOLIO_GUIDE_LINK_${markdownLinks.length}@@`;
+        markdownLinks.push(safeLink(url, label));
+        return token;
+      }
     );
-    // Preserve line breaks
-    return linked.replace(/\n/g, "<br>");
+
+    let rendered = escHtml(withLinkTokens)
+      .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+      .replace(
+        /(https?:\/\/[^\s<>"']+?)([)\].,;!?]*(?=\s|$))/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>$2'
+      );
+
+    markdownLinks.forEach((link, index) => {
+      rendered = rendered.replace(`@@PORTFOLIO_GUIDE_LINK_${index}@@`, link);
+    });
+    return rendered;
   }
 
-  function addBubble(role, text) {
+  // Render the small, safe Markdown subset commonly returned by the backend.
+  function renderText(text) {
+    return String(text)
+      .split("\n")
+      .map((line) => {
+        const heading = line.match(/^#{1,6}\s+(.+)$/);
+        if (heading) {
+          return `<strong class="message-heading">${renderInlineText(heading[1])}</strong>`;
+        }
+        return renderInlineText(line);
+      })
+      .join("<br>");
+  }
+
+  function getPageContext() {
+    const seenUrls = new Set();
+    const links = [];
+
+    document.querySelectorAll("a[href]").forEach((link) => {
+      const label = link.textContent.trim().replace(/\s+/g, " ");
+      if (!label) return;
+
+      try {
+        const url = new URL(link.getAttribute("href"), window.location.href);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return;
+        if (seenUrls.has(url.href)) return;
+        seenUrls.add(url.href);
+        links.push({ label, url: url.href });
+      } catch {
+        // Ignore malformed host-page links rather than blocking a chat request.
+      }
+    });
+
+    return {
+      url: window.location.href,
+      title: document.title,
+      path: window.location.pathname + window.location.hash,
+      links: links.slice(0, 40),
+    };
+  }
+
+  const MAX_CONVERSATION_MESSAGES = 40;
+  const MAX_CONVERSATION_CHARS = 24000;
+
+  function loadConversation() {
+    try {
+      const stored = JSON.parse(
+        sessionStorage.getItem(CONVERSATION_STORAGE_KEY) || "[]"
+      );
+      if (!Array.isArray(stored)) return [];
+      return stored
+        .filter(
+          (message) =>
+            message &&
+            (message.role === "user" || message.role === "bot") &&
+            typeof message.text === "string" &&
+            message.text.trim()
+        )
+        .slice(-MAX_CONVERSATION_MESSAGES);
+    } catch {
+      return [];
+    }
+  }
+
+  let conversationHistory = loadConversation();
+
+  function persistConversation() {
+    try {
+      let messages = conversationHistory.slice(-MAX_CONVERSATION_MESSAGES);
+      while (
+        JSON.stringify(messages).length > MAX_CONVERSATION_CHARS &&
+        messages.length > 1
+      ) {
+        messages = messages.slice(1);
+      }
+      conversationHistory = messages;
+      sessionStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // Chat remains usable if storage is unavailable or full.
+    }
+  }
+
+  function recordMessage(role, text) {
+    if (!text || !String(text).trim()) return;
+    conversationHistory.push({ role, text: String(text) });
+    persistConversation();
+  }
+
+  function addBubble(role, text, { record = true } = {}) {
+    if (record) recordMessage(role, text);
     const el = document.createElement("div");
     const label = role === "user" ? "YOU >" : "GUIDE >";
     el.className = `message ${role}`;
@@ -316,6 +512,8 @@
     const el = document.createElement("div");
     el.className = "message bot typing";
     el.id = "typing-indicator";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
     el.innerHTML = '<span class="message-label">GUIDE &gt;</span><div class="message-body">retrieving site context...</div>';
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -330,11 +528,25 @@
   function setInputEnabled(enabled) {
     userInput.disabled = !enabled;
     sendBtn.disabled = !enabled;
+    suggestionsEl.querySelectorAll("button").forEach((button) => {
+      button.disabled = !enabled;
+    });
     if (enabled) userInput.focus();
   }
 
+  function restoreConversation() {
+    conversationHistory.forEach(({ role, text }) => {
+      addBubble(role, text, { record: false });
+    });
+    if (conversationHistory.length) {
+      suggestionsEl.hidden = true;
+    }
+  }
+
   // Show greeting on first open
-  let greeted = false;
+  let greeted = conversationHistory.some(
+    (message) => message.role === "bot" && message.text === cfg.greeting
+  );
   function showGreetingOnce() {
     if (!greeted) {
       greeted = true;
@@ -342,10 +554,14 @@
     }
   }
 
+  restoreConversation();
+
   let isOpen = false;
   function openWidget() {
     isOpen = true;
     chatWindow.classList.add("open");
+    chatWindow.setAttribute("aria-hidden", "false");
+    chatWindow.removeAttribute("inert");
     fabBtn.setAttribute("aria-expanded", "true");
     showGreetingOnce();
     userInput.focus();
@@ -353,16 +569,48 @@
   function closeWidget() {
     isOpen = false;
     chatWindow.classList.remove("open");
+    chatWindow.setAttribute("aria-hidden", "true");
+    chatWindow.setAttribute("inert", "");
     fabBtn.setAttribute("aria-expanded", "false");
+    userInput.blur();
     fabBtn.focus();
   }
 
   fabBtn.addEventListener("click", () => (isOpen ? closeWidget() : openWidget()));
   closeBtn.addEventListener("click", closeWidget);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && isOpen) {
+  chatWindow.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
       closeWidget();
+      return;
     }
+
+    if (event.key !== "Tab") return;
+    const focusable = [...
+      chatWindow.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      ),
+    ];
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && shadow.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && shadow.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isOpen) closeWidget();
+  });
+
+  suggestionsEl.querySelectorAll(".suggestion-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      sendMessage(button.dataset.question || "");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -396,18 +644,24 @@
       if (msg.type === "token") {
         removeTypingIndicator();
         if (!currentBotBubble) {
-          currentBotBubble = addBubble("bot", "");
+          currentBotBubble = addBubble("bot", "", { record: false });
           currentBotText = "";
         }
         currentBotText += msg.text;
         updateBubbleText(currentBotBubble, currentBotText);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       } else if (msg.type === "done") {
+        recordMessage("bot", currentBotText);
         currentBotBubble = null;
         currentBotText = "";
+        messagesEl.setAttribute("aria-busy", "false");
         setInputEnabled(true);
       } else if (msg.type === "error") {
         removeTypingIndicator();
+        if (currentBotText) recordMessage("bot", currentBotText);
+        currentBotBubble = null;
+        currentBotText = "";
+        messagesEl.setAttribute("aria-busy", "false");
         addBubble("bot", "ERROR: " + (msg.message || "Something went wrong."));
         setInputEnabled(true);
       }
@@ -429,6 +683,7 @@
       pendingQueue.push(text);
       return;
     }
+    const pageContext = getPageContext();
     ws.send(
       JSON.stringify({
         type: "chat",
@@ -437,6 +692,11 @@
         target_url: cfg.targetUrl,
         info_url: cfg.infoUrl,
         lang: cfg.lang,
+        answer_scope: "portfolio_first_general_knowledge",
+        allow_general_knowledge: cfg.allowGeneralKnowledge,
+        current_page_url: pageContext.url,
+        current_page_title: pageContext.title,
+        page_context: pageContext,
       })
     );
   }
@@ -447,14 +707,18 @@
   // -------------------------------------------------------------------------
   // Send message
   // -------------------------------------------------------------------------
-  function sendMessage() {
-    shadow.getElementById("chat-disclaimer")?.remove();
-    const text = userInput.value.trim();
+  function sendMessage(prefilledText = "") {
+    const text = (prefilledText || userInput.value).trim();
     if (!text) return;
 
+    const disclaimer = shadow.getElementById("chat-disclaimer");
+    disclaimer?.remove();
+    chatWindow.removeAttribute("aria-describedby");
+    suggestionsEl.hidden = true;
     addBubble("user", text);
     userInput.value = "";
     setInputEnabled(false);
+    messagesEl.setAttribute("aria-busy", "true");
     addTypingIndicator();
 
     sendToWS(text);

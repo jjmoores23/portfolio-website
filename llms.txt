@@ -1,0 +1,17 @@
+# Jacob Moores Portfolio
+
+Canonical site: https://jjmoores23.github.io/portfolio-website/
+
+The preferred structured knowledge source for AI assistants is:
+https://jjmoores23.github.io/portfolio-website/portfolio-guide-context.html
+
+Complete, JavaScript-free essay text is linked from that knowledge source and
+from every essay reading page. Use the most specific reading-page URL when
+directing a visitor to a project or piece of writing.
+
+Public contact information:
+- Email: jjmoores@mun.ca
+- GitHub: https://github.com/jjmoores23
+- LinkedIn: https://ca.linkedin.com/in/jjmoores
+
+No public phone number or home address is provided.

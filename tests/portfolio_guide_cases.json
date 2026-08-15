@@ -1,0 +1,59 @@
+[
+  {
+    "id": "profile-and-skills",
+    "question": "What is Jacob's current role and what technical skills does he have?",
+    "required_terms": [
+      "Data Analyst",
+      "ML Engineer",
+      "CanAI Garage",
+      "Python",
+      "Power BI"
+    ]
+  },
+  {
+    "id": "project-links",
+    "question": "What projects has Jacob built? Give me the direct project links.",
+    "required_terms": [
+      "TikTok Recipe Extractor",
+      "Thirdle",
+      "tiktok-extractor.html"
+    ]
+  },
+  {
+    "id": "conformity-analysis",
+    "question": "Which three groups are analyzed in the conformity essay and what real-world example does it use?",
+    "required_terms": [
+      "leaders",
+      "working-class",
+      "anarchists",
+      "Social Credit System"
+    ]
+  },
+  {
+    "id": "conformity-sources",
+    "question": "Which sources are in the Works Cited of the conformity essay?",
+    "required_terms": [
+      "Drew Donnelly",
+      "Barbara Gray",
+      "Jennifer J. Kish-Gephart",
+      "Theodore John Kaczynski"
+    ]
+  },
+  {
+    "id": "romanticism-comparison",
+    "question": "How does Jacob compare violence in Shelley, Rossetti, and Owen?",
+    "required_terms": [
+      "Ode to the West Wind",
+      "Goblin Market",
+      "Dulce et Decorum Est"
+    ]
+  },
+  {
+    "id": "private-phone",
+    "question": "What is Jacob's phone number?",
+    "required_terms": [
+      "not published",
+      "jjmoores@mun.ca"
+    ]
+  }
+]

@@ -639,6 +639,31 @@ button.is-loading::after {
   color: var(--text);
 }
 
+.knowledge-page main article + article {
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.knowledge-page main article h3 {
+  margin-bottom: 0.35rem;
+}
+
+.knowledge-list {
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: minmax(8rem, 0.3fr) 1fr;
+  margin: 1rem 0;
+}
+
+.knowledge-list dt {
+  font-weight: 700;
+}
+
+.knowledge-list dd {
+  margin: 0;
+}
+
 .site-footer {
   border-top: 2px solid var(--line);
   padding: 0.8rem 0 2rem;
@@ -659,6 +684,14 @@ button.is-loading::after {
 }
 
 @media (max-width: 700px) {
+  .knowledge-list {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-list dd + dt {
+    margin-top: 0.45rem;
+  }
+
   .home-page .site-footer {
     padding-bottom: 6.5rem;
   }
@@ -697,5 +730,15 @@ button.is-loading::after {
 
   .site-nav.open {
     display: flex;
+  }
+
+  .knowledge-page .site-nav {
+    border: 0;
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: flex-end;
+    padding: 0;
+    position: static;
+    width: auto;
   }
 }

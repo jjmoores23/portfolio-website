@@ -53,6 +53,35 @@ source .venv/bin/activate
 pytest -q
 ```
 
+The Portfolio Guide uses `portfolio-guide-context.html` as its canonical,
+crawler-friendly knowledge source. `tests/portfolio_guide_cases.json` records
+representative questions and the facts that the source must cover. Every essay
+also links to a complete plain-text version so crawlers are not required to run
+JavaScript.
+
+The widget declares `portfolio_first_general_knowledge` in each chat request.
+This tells a compatible backend to use the portfolio source first, then answer
+safe general-knowledge questions from its own model knowledge. Prompt-injection,
+illegal, and unsafe requests should still be handled by the backend's safety
+policy. The client cannot force this behavior if the external backend ignores
+the `allow_general_knowledge` field.
+
+With the local static server running, verify the widget protocol, safe response
+formatting, and Shadow DOM interface without contacting the external AI service:
+
+```sh
+RUN_E2E_WIDGET=1 pytest tests/test_browser.py::test_portfolio_guide_widget_is_homepage_only -q
+```
+
+After deploying a knowledge-source change, run the optional end-to-end answer
+evaluation against the live external service:
+
+```sh
+RUN_LIVE_GUIDE_EVAL=1 pytest tests/test_browser.py::test_deployed_portfolio_guide_answers_quality_cases -q
+```
+
+Set `LIVE_GUIDE_URL` to evaluate a non-production deployment.
+
 With both local servers running, exercise the real Chrome interface against the
 known public TikTok fixture:
 
