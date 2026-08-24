@@ -1,6 +1,4 @@
-const pdfForm = document.getElementById("pdf-converter-form");
 const pdfFileInput = document.getElementById("pdf-file");
-const loadPdfButton = document.getElementById("load-pdf-button");
 const clearPdfButton = document.getElementById("clear-pdf-button");
 const convertPdfButton = document.getElementById("convert-pdf-button");
 const pdfStatus = document.getElementById("pdf-status");
@@ -133,7 +131,6 @@ const loadPdf = async () => {
   }
 
   state.file = file;
-  setLoading(loadPdfButton, true, "Loading pages...");
   if (convertPdfButton) {
     convertPdfButton.disabled = true;
   }
@@ -158,8 +155,6 @@ const loadPdf = async () => {
       pdfEmptyState.hidden = false;
     }
     setStatus(error && error.message ? error.message : "The PDF could not be loaded.");
-  } finally {
-    setLoading(loadPdfButton, false);
   }
 };
 
@@ -197,7 +192,7 @@ const downloadPowerPoint = async () => {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(downloadUrl);
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
     setStatus("PowerPoint downloaded. Open it in Microsoft PowerPoint to view the presenter notes.");
   } catch (error) {
     setStatus(error && error.message ? error.message : "The PDF could not be converted.");
@@ -227,11 +222,8 @@ const clearPdf = () => {
   setStatus("Choose a PDF to begin.");
 };
 
-if (pdfForm) {
-  pdfForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    loadPdf();
-  });
+if (pdfFileInput) {
+  pdfFileInput.addEventListener("change", loadPdf);
 }
 
 if (clearPdfButton) {

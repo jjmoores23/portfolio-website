@@ -12,7 +12,10 @@ from pptx import Presentation
 CHROME_PATH = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 PORTFOLIO_URL = "http://127.0.0.1:8000/index.html"
 EXTRACTOR_URL = "http://127.0.0.1:8000/tiktok-extractor.html?api=http://127.0.0.1:5055"
-PDF_CONVERTER_URL = "http://127.0.0.1:8000/pdf-to-ppt.html?api=http://127.0.0.1:5000"
+PDF_CONVERTER_URL = os.environ.get(
+    "PDF_CONVERTER_URL",
+    "http://127.0.0.1:8000/pdf-to-ppt.html?api=http://127.0.0.1:5000",
+)
 TIKTOK_URL = "https://vt.tiktok.com/ZSXhRCN9p/"
 SLOPPY_JOE_URL = "https://vt.tiktok.com/ZS434t6W7/"
 CREAMY_CHICKEN_PASTA_URL = "https://vt.tiktok.com/ZS43VX9Dd/"
@@ -426,9 +429,11 @@ def test_pdf_converter_adds_presenter_notes_in_real_browser(tmp_path):
                 "buffer": pdf_buffer.getvalue(),
             }
         )
-        page.locator("#load-pdf-button").click()
         page.locator("#pdf-note-1").wait_for(timeout=30_000)
         assert page.locator(".pdf-note-input").count() == 2
+        convert_y = page.locator("#convert-pdf-button").bounding_box()["y"]
+        first_note_y = page.locator("#pdf-note-1").bounding_box()["y"]
+        assert convert_y < first_note_y
 
         page.locator("#pdf-note-1").fill("Introduce the first page.")
         page.locator("#pdf-note-2").fill("Close with the second page.")

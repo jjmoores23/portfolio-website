@@ -12,7 +12,9 @@ from pptx.util import Inches
 
 PDF_MAX_PAGE_COUNT = 50
 MAX_NOTE_LENGTH = 10_000
-RENDER_DPI = 150
+RENDER_DPI = 120
+SLIDE_IMAGE_FORMAT = "jpeg"
+SLIDE_IMAGE_QUALITY = 90
 MAX_SLIDE_DIMENSION_INCHES = 13.333
 EMU_PER_PDF_POINT = 12_700
 
@@ -148,7 +150,9 @@ def convert_pdf_to_powerpoint(
             )
 
             pixmap = page.get_pixmap(dpi=RENDER_DPI, alpha=False)
-            image_stream = io.BytesIO(pixmap.tobytes("png"))
+            image_stream = io.BytesIO(
+                pixmap.tobytes(SLIDE_IMAGE_FORMAT, jpg_quality=SLIDE_IMAGE_QUALITY)
+            )
             slide.shapes.add_picture(
                 image_stream,
                 left,

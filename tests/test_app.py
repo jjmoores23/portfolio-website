@@ -1,5 +1,6 @@
 import io
 import json
+import zipfile
 
 import pymupdf
 import pytest
@@ -196,6 +197,11 @@ def test_pdf_to_powerpoint_contains_slide_images_and_presenter_notes(client):
         "Introduce the topic.",
         "Explain the conclusion.",
     ]
+
+    with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+        media_parts = [name for name in archive.namelist() if name.startswith("ppt/media/")]
+    assert len(media_parts) == 2
+    assert all(name.endswith(".jpg") for name in media_parts)
 
 
 def test_pdf_to_powerpoint_rejects_invalid_file(client):

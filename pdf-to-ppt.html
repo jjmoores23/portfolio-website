@@ -76,7 +76,6 @@
               PDF pages become slide images so their visual layout is preserved.
             </p>
             <div class="button-row">
-              <button type="submit" id="load-pdf-button">Load PDF pages</button>
               <button type="button" id="clear-pdf-button">Clear</button>
             </div>
           </form>
@@ -97,17 +96,17 @@
 
           <div id="pdf-notes-panel" hidden>
             <div class="result-block">
+              <div class="button-row pdf-convert-row">
+                <button type="button" id="convert-pdf-button" disabled>
+                  Convert to PowerPoint
+                </button>
+              </div>
               <h3 id="pdf-notes-heading">Presenter comments</h3>
               <p class="helper-text" id="pdf-notes-help">
                 Add optional comments for each slide. Blank fields remain blank
                 in the downloaded presentation.
               </p>
               <div id="pdf-page-notes"></div>
-              <div class="button-row">
-                <button type="button" id="convert-pdf-button" disabled>
-                  Convert to PowerPoint
-                </button>
-              </div>
             </div>
           </div>
         </article>
