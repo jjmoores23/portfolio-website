@@ -628,6 +628,25 @@ button.is-loading::after {
   margin: 0;
 }
 
+#pdf-page-notes {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.pdf-page-note {
+  border-top: 2px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.pdf-page-note .field-label {
+  margin-top: 0;
+}
+
+.pdf-note-input {
+  min-height: 5.5rem;
+}
+
 .portfolio-guide-note {
   border-top: 2px solid var(--line);
   color: var(--muted);

@@ -1,14 +1,18 @@
+import io
 import json
 import os
 from pathlib import Path
 
+import pymupdf
 import pytest
 from playwright.sync_api import sync_playwright
+from pptx import Presentation
 
 
 CHROME_PATH = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 PORTFOLIO_URL = "http://127.0.0.1:8000/index.html"
 EXTRACTOR_URL = "http://127.0.0.1:8000/tiktok-extractor.html?api=http://127.0.0.1:5055"
+PDF_CONVERTER_URL = "http://127.0.0.1:8000/pdf-to-ppt.html?api=http://127.0.0.1:5000"
 TIKTOK_URL = "https://vt.tiktok.com/ZSXhRCN9p/"
 SLOPPY_JOE_URL = "https://vt.tiktok.com/ZS434t6W7/"
 CREAMY_CHICKEN_PASTA_URL = "https://vt.tiktok.com/ZS43VX9Dd/"
@@ -390,6 +394,58 @@ def test_tiktok_extractor_in_real_browser():
         assert page.locator("#title-output").inner_text() == "Extracted Recipe"
         assert page.locator("#ingredients-output > li").inner_text() == "Paste recipe text and click Extract."
         assert page.locator("#steps-output > li").inner_text() == "Steps will appear here."
+        browser.close()
+
+
+@pytest.mark.skipif(
+    os.environ.get("RUN_E2E") != "1",
+    reason="Set RUN_E2E=1 after starting the local API and static servers.",
+)
+def test_pdf_converter_adds_presenter_notes_in_real_browser(tmp_path):
+    document = pymupdf.open()
+    for page_number in range(1, 3):
+        page = document.new_page(width=612, height=792)
+        page.insert_text((72, 100), f"Browser test page {page_number}", fontsize=24)
+    pdf_buffer = io.BytesIO()
+    document.save(pdf_buffer)
+    document.close()
+
+    page_errors = []
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            executable_path=str(CHROME_PATH),
+            headless=True,
+        )
+        page = browser.new_page()
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
+        page.goto(PDF_CONVERTER_URL, wait_until="networkidle")
+        page.locator("#pdf-file").set_input_files(
+            {
+                "name": "speaker-notes.pdf",
+                "mimeType": "application/pdf",
+                "buffer": pdf_buffer.getvalue(),
+            }
+        )
+        page.locator("#load-pdf-button").click()
+        page.locator("#pdf-note-1").wait_for(timeout=30_000)
+        assert page.locator(".pdf-note-input").count() == 2
+
+        page.locator("#pdf-note-1").fill("Introduce the first page.")
+        page.locator("#pdf-note-2").fill("Close with the second page.")
+        with page.expect_download() as download_info:
+            page.locator("#convert-pdf-button").click()
+        download = download_info.value
+        assert download.suggested_filename == "speaker-notes.pptx"
+
+        output_path = tmp_path / download.suggested_filename
+        download.save_as(str(output_path))
+        presentation = Presentation(str(output_path))
+        assert [slide.notes_slide.notes_text_frame.text for slide in presentation.slides] == [
+            "Introduce the first page.",
+            "Close with the second page.",
+        ]
+        assert "PowerPoint downloaded" in page.locator("#pdf-status").inner_text()
+        assert not page_errors
         browser.close()
 
 

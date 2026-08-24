@@ -1,5 +1,6 @@
 import os
 import io
+import json
 import re
 from dataclasses import dataclass
 from html import unescape
@@ -12,6 +13,12 @@ from bs4 import BeautifulSoup
 from flask import Flask, Response, jsonify, render_template, request, send_file
 from flask_cors import CORS
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
+
+from pdf_to_ppt import (
+    PDF_MAX_PAGE_COUNT,
+    convert_pdf_to_powerpoint,
+    get_pdf_page_count,
+)
 
 
 USER_AGENT = (
@@ -409,6 +416,13 @@ def _safe_recipe_filename(title: str) -> str:
     return cleaned if cleaned and cleaned.lower() != "extracted recipe" else "TikTokRecipe"
 
 
+def _safe_powerpoint_filename(filename: str) -> str:
+    stem = Path(filename or "converted").stem
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", stem)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(". ")
+    return cleaned or "converted"
+
+
 def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     candidates = [
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -559,6 +573,47 @@ def api_extract():
             },
             "recipe_text": recipe.to_text(),
         }
+    )
+
+
+@app.route("/api/pdf-info", methods=["POST"])
+def api_pdf_info():
+    pdf_file = request.files.get("pdf_file")
+    if not pdf_file or not pdf_file.filename:
+        raise ValueError("Please choose a PDF file first.")
+
+    page_count = get_pdf_page_count(pdf_file.read())
+    return jsonify(
+        {
+            "filename": pdf_file.filename,
+            "page_count": page_count,
+            "max_page_count": PDF_MAX_PAGE_COUNT,
+        }
+    )
+
+
+@app.route("/api/pdf-to-ppt", methods=["POST"])
+def api_pdf_to_powerpoint():
+    pdf_file = request.files.get("pdf_file")
+    if not pdf_file or not pdf_file.filename:
+        raise ValueError("Please choose a PDF file first.")
+
+    raw_notes = request.form.get("notes", "")
+    if raw_notes:
+        try:
+            notes = json.loads(raw_notes)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Presenter comments were not formatted correctly.") from exc
+    else:
+        notes = None
+
+    presentation = convert_pdf_to_powerpoint(pdf_file.read(), notes=notes)
+    download_name = f"{_safe_powerpoint_filename(pdf_file.filename)}.pptx"
+    return send_file(
+        presentation,
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        as_attachment=True,
+        download_name=download_name,
     )
 
 

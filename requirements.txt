@@ -5,3 +5,5 @@ urllib3==1.26.20
 beautifulsoup4==4.12.3
 Pillow==10.4.0
 gunicorn==22.0.0
+PyMuPDF==1.26.5
+python-pptx==1.0.2

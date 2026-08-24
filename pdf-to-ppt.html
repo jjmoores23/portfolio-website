@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF to PowerPoint | Portfolio</title>
+    <meta
+      name="description"
+      content="Convert each PDF page into a PowerPoint slide and add presenter comments to the notes for each slide."
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  </head>
+  <body class="project-page">
+    <header class="site-header">
+      <a
+        class="brand"
+        href="#"
+        aria-label="Toggle color theme"
+        aria-pressed="false"
+        title="Toggle dark mode"
+        >J.M.</a
+      >
+      <a
+        class="header-logo-target"
+        id="brand-logo-target"
+        href="index.html"
+        aria-label="Back to homepage"
+      >
+        <img src="newlogo.png" alt="JM circular logo" />
+      </a>
+      <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Main">
+        <a href="index.html#about">About</a>
+        <a href="index.html#resume">Resume</a>
+        <details class="nav-projects" open>
+          <summary>Projects</summary>
+          <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
+            <a href="tiktok-extractor.html" role="menuitem">TikTok Recipe Extractor</a>
+            <a href="pdf-to-ppt.html" role="menuitem" aria-current="page">PDF to PowerPoint</a>
+          </div>
+        </details>
+        <a href="index.html#work">Work</a>
+        <a href="index.html#websites">Websites</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="section-border page-hero">
+        <p class="kicker">Project</p>
+        <h1>PDF to PowerPoint</h1>
+        <p class="lede">
+          Upload a PDF to create a PowerPoint slideshow with one image-based
+          slide per page. Add presenter comments for each page and download a
+          presentation ready to open in Microsoft PowerPoint.
+        </p>
+      </section>
+
+      <section class="section-border app-grid">
+        <article>
+          <form id="pdf-converter-form">
+            <label class="field-label" for="pdf-file">PDF file</label>
+            <input id="pdf-file" type="file" accept=".pdf,application/pdf" required />
+            <p class="helper-text">
+              The first version supports PDFs up to 16 MB and 50 pages. Your
+              PDF pages become slide images so their visual layout is preserved.
+            </p>
+            <div class="button-row">
+              <button type="submit" id="load-pdf-button">Load PDF pages</button>
+              <button type="button" id="clear-pdf-button">Clear</button>
+            </div>
+          </form>
+          <p class="helper-text" id="pdf-status" aria-live="polite">
+            Choose a PDF to begin.
+          </p>
+        </article>
+
+        <article>
+          <div class="result-block" id="pdf-empty-state">
+            <h3>Presenter comments</h3>
+            <p>
+              After the PDF pages load, a notes field will appear for each
+              slide. These comments are stored in PowerPoint's presenter notes,
+              not printed over the slide image.
+            </p>
+          </div>
+
+          <div id="pdf-notes-panel" hidden>
+            <div class="result-block">
+              <h3 id="pdf-notes-heading">Presenter comments</h3>
+              <p class="helper-text" id="pdf-notes-help">
+                Add optional comments for each slide. Blank fields remain blank
+                in the downloaded presentation.
+              </p>
+              <div id="pdf-page-notes"></div>
+              <div class="button-row">
+                <button type="button" id="convert-pdf-button" disabled>
+                  Convert to PowerPoint
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Moores 2026</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="pdf-to-ppt.js"></script>
+  </body>
+</html>

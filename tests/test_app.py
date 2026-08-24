@@ -1,7 +1,10 @@
 import io
+import json
 
+import pymupdf
 import pytest
 from PIL import Image
+from pptx import Presentation
 
 import app as recipe_app
 
@@ -10,6 +13,18 @@ import app as recipe_app
 def client():
     recipe_app.app.config.update(TESTING=True)
     return recipe_app.app.test_client()
+
+
+def make_test_pdf(page_count=2):
+    document = pymupdf.open()
+    for page_number in range(1, page_count + 1):
+        page = document.new_page(width=612, height=792)
+        page.insert_text((72, 100), f"Test PDF page {page_number}", fontsize=24)
+
+    output = io.BytesIO()
+    document.save(output)
+    document.close()
+    return output.getvalue()
 
 
 @pytest.mark.parametrize(
@@ -146,6 +161,53 @@ def test_api_extract_returns_json_error(client):
     assert response.status_code == 400
     assert response.is_json
     assert "TikTok URL" in response.get_json()["error"]
+
+
+def test_pdf_info_returns_page_count(client):
+    response = client.post(
+        "/api/pdf-info",
+        data={"pdf_file": (io.BytesIO(make_test_pdf(3)), "notes-deck.pdf")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["page_count"] == 3
+    assert response.get_json()["filename"] == "notes-deck.pdf"
+
+
+def test_pdf_to_powerpoint_contains_slide_images_and_presenter_notes(client):
+    response = client.post(
+        "/api/pdf-to-ppt",
+        data={
+            "pdf_file": (io.BytesIO(make_test_pdf(2)), "speaker-deck.pdf"),
+            "notes": json.dumps(["Introduce the topic.", "Explain the conclusion."]),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    assert "speaker-deck.pptx" in response.headers["Content-Disposition"]
+
+    presentation = Presentation(io.BytesIO(response.data))
+    assert len(presentation.slides) == 2
+    assert all(len(slide.shapes) == 1 for slide in presentation.slides)
+    assert [slide.notes_slide.notes_text_frame.text for slide in presentation.slides] == [
+        "Introduce the topic.",
+        "Explain the conclusion.",
+    ]
+
+
+def test_pdf_to_powerpoint_rejects_invalid_file(client):
+    response = client.post(
+        "/api/pdf-to-ppt",
+        data={"pdf_file": (io.BytesIO(b"not a pdf"), "broken.pdf")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.is_json
+    assert "valid PDF" in response.get_json()["error"]
 
 
 def test_text_download(client):

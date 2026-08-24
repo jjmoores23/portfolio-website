@@ -46,6 +46,17 @@ that sheet; browsers without file sharing fall back to a normal download.
 The API cannot retrieve private, deleted, region-restricted, or otherwise
 blocked TikTok videos. In those cases, paste the caption or transcript manually.
 
+## PDF to PowerPoint
+
+Open `http://127.0.0.1:8000/pdf-to-ppt.html` while the API and static servers are
+running. Upload a PDF, add optional presenter comments for each page, and
+download a `.pptx` file. Each PDF page is rendered as a slide image so the
+original visual layout is preserved; presenter comments are stored in the
+PowerPoint notes area.
+
+The first version accepts PDFs up to 16 MB and 50 pages. Uploaded PDF content is
+processed for the conversion request and is not saved as a user document.
+
 ## Tests
 
 ```sh
