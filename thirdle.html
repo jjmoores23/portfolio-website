@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thirdle | Portfolio</title>
+    <meta
+      name="description"
+      content="Play a browser edition of Thirdle, a terminal-based word game built in Python."
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  </head>
+  <body class="project-page thirdle-page">
+    <header class="site-header">
+      <a
+        class="brand"
+        href="#"
+        aria-label="Toggle color theme"
+        aria-pressed="false"
+        title="Toggle dark mode"
+        >J.M.</a
+      >
+      <a
+        class="header-logo-target"
+        id="brand-logo-target"
+        href="index.html"
+        aria-label="Back to homepage"
+      >
+        <img src="newlogo.png" alt="JM circular logo" />
+      </a>
+      <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="primary-nav"
+      >
+        Menu
+      </button>
+      <nav class="site-nav" id="primary-nav" aria-label="Main">
+        <a href="index.html#about">About</a>
+        <a href="index.html#resume">Resume</a>
+        <details class="nav-projects" open>
+          <summary>Projects</summary>
+          <div class="projects-dropdown" role="menu" aria-label="Projects submenu">
+            <a href="tiktok-extractor.html" role="menuitem">TikTok Recipe Extractor</a>
+            <a href="pdf-to-ppt.html" role="menuitem">PDF to PowerPoint</a>
+            <a href="thirdle.html" role="menuitem" aria-current="page">Thirdle</a>
+          </div>
+        </details>
+        <a href="index.html#work">Work</a>
+        <a href="index.html#websites">Websites</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="section-border page-hero">
+        <p class="kicker">Project / Browser Edition</p>
+        <h1>Thirdle</h1>
+        <p class="lede">
+          A terminal-based word game built in Python, now playable in your
+          browser. Choose a three-, four-, or five-letter puzzle and solve it in
+          six guesses.
+        </p>
+        <div class="thirdle-links">
+          <a
+            class="button-link"
+            href="https://github.com/jjmoores23/Thirdle"
+            target="_blank"
+            rel="noreferrer"
+            >Python source on GitHub</a
+          >
+          <a class="button-link" href="#original">Run the Python CLI</a>
+        </div>
+      </section>
+
+      <section
+        class="section-border thirdle-play-area"
+        aria-labelledby="thirdle-play-heading"
+      >
+        <h2 id="thirdle-play-heading">Play Thirdle</h2>
+        <div class="thirdle-controls">
+          <label class="thirdle-length-label" for="thirdle-word-length">
+            <span>Word length</span>
+            <select id="thirdle-word-length">
+              <option value="3">3 letters</option>
+              <option value="4" selected>4 letters</option>
+              <option value="5">5 letters</option>
+            </select>
+          </label>
+          <button type="button" id="thirdle-new-game">
+            <span>New game</span>
+          </button>
+          <button type="button" id="thirdle-hint">
+            <span>Use a hint</span>
+            <small>(2 guesses)</small>
+          </button>
+        </div>
+        <p class="thirdle-attempt-count" id="thirdle-attempt-count"></p>
+        <p class="thirdle-status" id="thirdle-status" role="status" aria-live="polite"></p>
+
+        <div class="thirdle-layout">
+          <div class="thirdle-board-area">
+            <div
+              class="thirdle-board"
+              id="thirdle-board"
+              role="grid"
+              aria-label="Thirdle guess board"
+            ></div>
+            <div
+              class="thirdle-keyboard"
+              id="thirdle-keyboard"
+              role="group"
+              aria-label="On-screen keyboard"
+            ></div>
+          </div>
+
+          <div class="thirdle-input-area">
+            <form id="thirdle-guess-form" class="thirdle-guess-form">
+              <label class="field-label" for="thirdle-guess">Enter your guess</label>
+              <div class="thirdle-input-row">
+                <input
+                  class="thirdle-input"
+                  id="thirdle-guess"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  spellcheck="false"
+                  maxlength="4"
+                  aria-describedby="thirdle-guess-help"
+                />
+                <button type="submit" id="thirdle-submit-guess">Guess</button>
+              </div>
+            </form>
+            <p class="helper-text" id="thirdle-guess-help">
+              Guesses are checked by length, as in the Python version.
+            </p>
+            <div class="thirdle-legend" aria-label="Letter colors">
+              <span><i class="thirdle-swatch is-correct" aria-hidden="true"></i>Right place</span>
+              <span><i class="thirdle-swatch is-present" aria-hidden="true"></i>In the word</span>
+              <span><i class="thirdle-swatch is-absent" aria-hidden="true"></i>Not in the word</span>
+            </div>
+            <p class="helper-text">
+              A hint reveals one letter and position, and uses two guess rows.
+              The browser edition has a compact built-in word bank; the original
+              Python app remains available on GitHub.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="section-border thirdle-original"
+        id="original"
+        aria-labelledby="thirdle-original-heading"
+      >
+        <h2 id="thirdle-original-heading">The original terminal app</h2>
+        <div class="grid-two">
+          <article>
+            <p>
+              Thirdle is a Python command-line game with three word lengths,
+              six attempts, and an optional hint. To run the original version,
+              clone the repository, install its color support, and start the game
+              from the project folder.
+            </p>
+            <p>
+              <a
+                class="button-link"
+                href="https://github.com/jjmoores23/Thirdle"
+                target="_blank"
+                rel="noreferrer"
+                >Thirdle on GitHub</a
+              >
+            </p>
+          </article>
+          <div class="terminal">
+            <div class="terminal-bar">
+              <span>~/Thirdle</span>
+              <span>Python CLI</span>
+            </div>
+            <pre><code>$ pip install colorama
+$ python play_thirdle.py</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Moores 2026</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="thirdle.js"></script>
+  </body>
+</html>

@@ -1,13 +1,4 @@
 @font-face {
-  font-family: "pgLang Roman";
-  font-display: swap;
-  src:
-    local("Times New Roman"),
-    local("Times"),
-    url("fonts/PgLang.woff2") format("woff2");
-}
-
-@font-face {
   font-family: "courier-std";
   font-style: normal;
   font-weight: 500;
@@ -356,11 +347,16 @@ body.logo-render-active .logo-float-image {
   }
 }
 
+.hero {
+  border: 1px solid var(--muted);
+  padding: clamp(0.65rem, 1.2vw, 1rem);
+}
+
 .hero h1 {
-  margin: 0.2rem 0 0.6rem;
-  font-family: "pgLang Roman", "Times", "Times New Roman", Georgia, serif;
-  font-size: clamp(2rem, 6vw, 4.25rem);
-  line-height: 1;
+  margin: 0 0 0.35rem;
+  font-family: "Times", "Times New Roman", Georgia, serif;
+  font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+  line-height: 1.1;
   font-weight: 400;
   letter-spacing: 0.01em;
 }
@@ -373,6 +369,11 @@ body.logo-render-active .logo-float-image {
 .lede {
   max-width: 44ch;
   margin: 0;
+}
+
+.hero .lede {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .grid-two {
@@ -436,6 +437,12 @@ h2 {
   font-size: 0.9rem;
 }
 
+.work-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
 .page-hero {
   display: grid;
   gap: 0.5rem;
@@ -445,6 +452,258 @@ h2 {
   display: grid;
   gap: 1rem;
   grid-template-columns: 1.1fr 0.9fr;
+}
+
+.thirdle-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.thirdle-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.thirdle-page main {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.thirdle-page main > section {
+  min-width: 0;
+}
+
+.thirdle-links .button-link,
+.thirdle-original .button-link {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.thirdle-play-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.8rem;
+}
+
+.thirdle-play-area h2 {
+  margin-bottom: 0;
+}
+
+.thirdle-original .grid-two > * {
+  min-width: 0;
+}
+
+.thirdle-length-label {
+  display: grid;
+  grid-template-rows: auto 3.25rem;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.thirdle-length-label select {
+  width: 100%;
+  min-width: 0;
+  height: 3.25rem;
+  border: 2px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+}
+
+.thirdle-controls > button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  height: 3.25rem;
+  align-self: end;
+  place-content: center;
+  gap: 0.1rem;
+  padding: 0.25rem;
+  line-height: 1.1;
+}
+
+.thirdle-controls > button small {
+  font-size: 0.75em;
+}
+
+.thirdle-attempt-count,
+.thirdle-status {
+  margin: 0;
+}
+
+.thirdle-attempt-count {
+  font-weight: 600;
+}
+
+.thirdle-status {
+  min-height: 1.5em;
+  color: var(--muted);
+}
+
+.thirdle-status[data-state="error"] {
+  color: #a01828;
+}
+
+body.theme-dark .thirdle-status[data-state="error"] {
+  color: #ff9a9a;
+}
+
+.thirdle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(15rem, 0.9fr);
+  min-width: 0;
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.thirdle-board {
+  display: grid;
+  width: min(100%, 22rem);
+  gap: 0.35rem;
+  margin-inline: auto;
+}
+
+.thirdle-row {
+  display: grid;
+  grid-template-columns: repeat(var(--thirdle-word-length, 4), minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.thirdle-tile {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid var(--muted);
+  font-size: clamp(1.2rem, 4vw, 2rem);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.thirdle-tile[data-state="draft"] {
+  border-color: var(--line);
+}
+
+.thirdle-tile[data-state="correct"],
+.thirdle-key[data-state="correct"] {
+  border-color: #327d49;
+  background: #327d49;
+  color: #fff;
+}
+
+.thirdle-tile[data-state="present"],
+.thirdle-key[data-state="present"] {
+  border-color: #9c3d86;
+  background: #9c3d86;
+  color: #fff;
+}
+
+.thirdle-tile[data-state="absent"],
+.thirdle-key[data-state="absent"] {
+  border-color: #656a73;
+  background: #656a73;
+  color: #fff;
+}
+
+.thirdle-tile[data-state="hint"] {
+  border-color: #d3b345;
+  background: #e8cb63;
+}
+
+.thirdle-keyboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 32rem;
+  gap: 0.3rem;
+  margin: 0.8rem auto 0;
+}
+
+.thirdle-key-row {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  gap: 0.22rem;
+}
+
+.thirdle-key {
+  flex: 1;
+  min-width: 0;
+  max-width: 2.6rem;
+  min-height: 2.7rem;
+  padding: 0.35rem 0.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.thirdle-key-wide {
+  flex: 1.5;
+  max-width: 4rem;
+  font-size: 0.7rem;
+}
+
+.thirdle-input-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.thirdle-guess-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.thirdle-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.thirdle-input {
+  flex: 1;
+  min-width: 0;
+  border: 2px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0.55rem;
+  text-transform: uppercase;
+}
+
+.thirdle-legend {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.4rem 0;
+}
+
+.thirdle-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.thirdle-swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.15rem;
+}
+
+.thirdle-swatch.is-correct {
+  background: #327d49;
+}
+
+.thirdle-swatch.is-present {
+  background: #9c3d86;
+}
+
+.thirdle-swatch.is-absent {
+  background: #656a73;
 }
 
 .essay-viewer {
@@ -705,6 +964,14 @@ button.is-loading::after {
   .app-grid {
     grid-template-columns: 1fr;
   }
+
+  .thirdle-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thirdle-layout > * {
+    min-width: 0;
+  }
 }
 
 @media (max-width: 700px) {
@@ -718,6 +985,12 @@ button.is-loading::after {
 
   .home-page .site-footer {
     padding-bottom: 6.5rem;
+  }
+
+  @media (max-width: 500px) {
+    .thirdle-controls {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .menu-toggle {

@@ -416,7 +416,10 @@ if (document.body.classList.contains("essay-page")) {
   const revealObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        entry.target.classList.toggle("is-revealed", entry.isIntersecting);
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-revealed");
+          revealObserver.unobserve(entry.target);
+        }
       });
     },
     {
